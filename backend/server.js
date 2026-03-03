@@ -118,7 +118,9 @@ async function createCustomerDoc({ name, email, passwordHash }) {
 
 // ---------------- routes ----------------
 app.get("/ping", (req, res) => res.json({ message: "Backend is working ✅" }));
-
+app.get("/", (req, res) => {
+  res.json({ message: "Technova AI Customer Success Guardian Backend Running 🚀" });
+});
 // ✅ CUSTOMER SIGNUP
 // body: { name, email, password }
 app.post("/auth/signup", async (req, res) => {
