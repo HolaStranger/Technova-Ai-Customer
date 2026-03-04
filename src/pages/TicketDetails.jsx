@@ -8,7 +8,6 @@ export default function TicketDetails() {
   const { id } = useParams();
   const [params] = useSearchParams();
 
-  // ✅ only technician sees buttons
   const isTechnician = (params.get("role") || "").toLowerCase() === "tech";
 
   const [ticket, setTicket] = useState(null);
@@ -21,7 +20,7 @@ export default function TicketDetails() {
       setLoading(true);
       setError("");
 
-      const res = await fetch(`${API}/tickets/${id}`);
+      const res = await fetch(`${API}/api/tickets/${id}`);
       const data = await res.json();
 
       if (!res.ok) throw new Error(data?.error || "Failed to load ticket");
@@ -29,7 +28,7 @@ export default function TicketDetails() {
       setTicket(data);
     } catch (e) {
       setTicket(null);
-      setError(e.message || "Failed to fetch");
+      setError(e.message || "Failed to fetch ticket");
     } finally {
       setLoading(false);
     }
@@ -44,13 +43,14 @@ export default function TicketDetails() {
 
       const ticketKey = ticket.ticketId || ticket.id;
 
-      const res = await fetch(`${API}/tickets/${ticketKey}/status`, {
+      const res = await fetch(`${API}/api/tickets/${ticketKey}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
 
       const data = await res.json();
+
       if (!res.ok) throw new Error(data?.error || "Failed to update status");
 
       setTicket(data);
@@ -63,23 +63,21 @@ export default function TicketDetails() {
 
   useEffect(() => {
     loadTicket();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const statusLower = String(ticket?.status || "").toLowerCase();
 
   const isResolved =
-    statusLower.includes("self") ||
-    statusLower.includes("fixed") ||
     statusLower.includes("resolved") ||
-    statusLower.includes("closed") ||
-    statusLower === "done";
+    statusLower.includes("completed") ||
+    statusLower.includes("closed");
 
   const statusPill = useMemo(() => {
-    if (isResolved)
+    if (isResolved) {
       return { cls: "pillGreen", label: ticket?.status || "Done" };
+    }
 
-    if (statusLower.includes("dispatch")) {
+    if (statusLower.includes("dispatch") || ticket?.technicianId) {
       return { cls: "pillOrange", label: ticket?.status || "Dispatched" };
     }
 
@@ -92,20 +90,20 @@ export default function TicketDetails() {
     }
 
     return { cls: "pillBlue", label: ticket?.status || "Open" };
-  }, [ticket, isResolved, statusLower]);
+  }, [ticket, statusLower, isResolved]);
 
   return (
     <div className="page">
-      <style>{css}</style>
-
-      {/* Top bar */}
+            <style>{css}</style>
       <div className="topBar">
         <div className="topBarInner">
           <button className="iconBtn" onClick={() => navigate(-1)}>
             ‹
           </button>
+
           <div className="topTitle">Ticket Details</div>
-          <button className="iconBtn" onClick={loadTicket} title="Refresh">
+
+          <button className="iconBtn" onClick={loadTicket}>
             ↻
           </button>
         </div>
@@ -114,8 +112,8 @@ export default function TicketDetails() {
       <div className="wrap">
         {loading && (
           <div className="stateBox">
-            <div className="stateTitle">Loading…</div>
-            <div className="stateText">Getting ticket information</div>
+            <div className="stateTitle">Loading...</div>
+            <div className="stateText">Fetching ticket details</div>
           </div>
         )}
 
@@ -132,29 +130,37 @@ export default function TicketDetails() {
               <div className="topRow">
                 <div>
                   <div className="mutedLabel">Ticket ID</div>
-                  <div className="ticketId">{ticket.ticketId || ticket.id}</div>
+                  <div className="ticketId">
+                    {ticket.ticketId || ticket.id}
+                  </div>
                 </div>
+
                 <div className={`pill ${statusPill.cls}`}>
                   {statusPill.label}
                 </div>
               </div>
 
-              <div className="title">{ticket.issue || "No issue provided"}</div>
+              <div className="title">
+                {ticket.issueDescription || "No issue provided"}
+              </div>
 
               <div className="grid">
-                <Info label="Customer Name" value={ticket.customerName} />
+                <Info label="Customer ID" value={ticket.customerId} />
+                <Info label="Serial Number" value={ticket.serialNumber} />
+                <Info label="Priority" value={ticket.priority} />
                 <Info label="Status" value={ticket.status} />
+                <Info label="Technician ID" value={ticket.technicianId} />
                 <Info label="Created At" value={fmt(ticket.createdAt)} />
-                <Info label="Updated At" value={fmt(ticket.updatedAt)} />
               </div>
 
               <div className="desc">
                 <div className="descLabel">Issue Details</div>
-                <div className="descText">{ticket.issue || "—"}</div>
+                <div className="descText">
+                  {ticket.issueDescription || "—"}
+                </div>
               </div>
             </div>
 
-            {/* ✅ Technician-only buttons */}
             {isTechnician && !isResolved && (
               <div className="btnRow">
                 <button
@@ -165,7 +171,6 @@ export default function TicketDetails() {
                   Accept
                 </button>
 
-                {/* ✅ merged (On The Way + In Progress) */}
                 <button
                   className="btnSecondary"
                   disabled={saving}
@@ -185,7 +190,9 @@ export default function TicketDetails() {
             )}
 
             {isTechnician && isResolved && (
-              <div className="doneNote">This ticket is completed.</div>
+              <div className="doneNote">
+                This ticket has been completed.
+              </div>
             )}
           </>
         )}
@@ -205,6 +212,7 @@ function Info({ label, value }) {
 
 function fmt(v) {
   if (!v) return "—";
+
   try {
     return new Date(v).toLocaleString();
   } catch {

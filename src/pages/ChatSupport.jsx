@@ -7,6 +7,7 @@ export default function ChatSupport() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState("menu");
+
   const [form, setForm] = useState({
     customerName: "",
     phone: "",
@@ -18,12 +19,17 @@ export default function ChatSupport() {
     {
       role: "ai",
       text: "Hello! Welcome to TechNova Support.",
-      options: ["1. Report an issue", "2. Check warranty", "3. Track technician"],
+      options: [
+        "1. Report an issue",
+        "2. Check warranty",
+        "3. Track technician"
+      ],
     },
   ]);
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -37,81 +43,112 @@ export default function ChatSupport() {
   const sendToBackend = async (endpoint, payload) => {
     const res = await fetch(`${API}${endpoint}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) throw new Error("Server error");
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Server error");
+    }
+
     return await res.json();
   };
 
   const sendMessage = async (override = null) => {
     const userText = override ?? input;
+
     if (!userText.trim() || loading) return;
 
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setInput("");
 
     /* ================= MENU ================= */
+
     if (step === "menu") {
       if (userText.includes("1")) {
         setStep("name");
         aiSay("Please enter your full name.");
-      } else if (userText.includes("2")) {
+      }
+
+      else if (userText.includes("2")) {
         setStep("warranty");
         aiSay("Please enter your product serial number.");
-      } else if (userText.includes("3")) {
+      }
+
+      else if (userText.includes("3")) {
         setStep("track");
         aiSay("Please enter your Ticket ID.");
-      } else {
-        aiSay("Please select an option.", [
+      }
+
+      else {
+        aiSay("Please select one of the options.", [
           "1. Report an issue",
           "2. Check warranty",
-          "3. Track technician",
+          "3. Track technician"
         ]);
       }
+
       return;
     }
 
     /* ================= WARRANTY ================= */
+
     if (step === "warranty") {
       try {
         setLoading(true);
         aiSay("Checking warranty status...");
 
-        const data = await sendToBackend("/warranty/check", {
-          serialNumber: userText,
+        const data = await sendToBackend("/check-warranty", {
+          serialNumber: userText
         });
 
-        aiSay(data.message || "Warranty check completed.");
-      } catch {
+        if (data.inWarranty) {
+          aiSay(`✅ Your product is under warranty until ${data.expiryDate}.`);
+        } else {
+          aiSay(`❌ Warranty expired on ${data.expiryDate}.`);
+        }
+
+      } catch (err) {
         aiSay("Unable to check warranty right now.");
-      } finally {
+      }
+
+      finally {
         setLoading(false);
         setStep("menu");
       }
+
       return;
     }
 
     /* ================= TRACK ================= */
+
     if (step === "track") {
       try {
         setLoading(true);
-        aiSay("Tracking your technician...");
+        aiSay("Tracking technician...");
 
         const data = await sendToBackend("/dispatch/track", {
-          ticketId: userText,
+          ticketId: userText
         });
 
         aiSay(
-          `Technician: ${data.technicianName}\nETA: ${data.estimatedArrival}`
+          `Technician: ${data.technicianName || "Not assigned"}\nETA: ${
+            data.estimatedArrival || "Not available"
+          }`
         );
-      } catch {
+
+      } catch (err) {
         aiSay("Unable to track technician right now.");
-      } finally {
+      }
+
+      finally {
         setLoading(false);
         setStep("menu");
       }
+
       return;
     }
 
@@ -147,8 +184,8 @@ export default function ChatSupport() {
           intent: "report_issue",
           payload: {
             ...form,
-            issue: userText,
-          },
+            issue: userText
+          }
         });
 
         aiSay(data.message || "Ticket created successfully.");
@@ -156,12 +193,16 @@ export default function ChatSupport() {
         if (data.ticketId) {
           setTimeout(() => navigate("/my-tickets?filter=active"), 800);
         }
-      } catch {
+
+      } catch (err) {
         aiSay("Failed to process your request.");
-      } finally {
+      }
+
+      finally {
         setLoading(false);
         setStep("menu");
       }
+
       return;
     }
   };
@@ -169,10 +210,12 @@ export default function ChatSupport() {
   return (
     <div className="page">
       <div className="wrap">
+
         <div className="chatArea">
           {messages.map((msg, idx) => (
             <div key={idx} className={msg.role === "user" ? "user" : "ai"}>
               <p>{msg.text}</p>
+
               {msg.options &&
                 msg.options.map((opt) => (
                   <button key={opt} onClick={() => sendMessage(opt)}>
@@ -181,7 +224,9 @@ export default function ChatSupport() {
                 ))}
             </div>
           ))}
+
           {loading && <p>AI is thinking...</p>}
+
           <div ref={chatEndRef} />
         </div>
 
@@ -189,14 +234,18 @@ export default function ChatSupport() {
           <input
             value={input}
             disabled={loading}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
             placeholder="Type your response..."
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") sendMessage();
+            }}
           />
+
           <button disabled={loading} onClick={() => sendMessage()}>
             Send
           </button>
         </div>
+
       </div>
     </div>
   );

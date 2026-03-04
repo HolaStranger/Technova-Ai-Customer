@@ -16,6 +16,7 @@ export default function CustomerSignup() {
 
   async function onSignup(e) {
     e.preventDefault();
+
     setError("");
     setSuccess("");
 
@@ -24,36 +25,42 @@ export default function CustomerSignup() {
 
       const res = await fetch(`${API}/auth/signup`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           name: name.trim(),
           email: email.trim().toLowerCase(),
-          password,
-        }),
+          password
+        })
       });
 
-      // if backend returns HTML error page, this prevents crash
-      const text = await res.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error(
-          "Server returned non-JSON response. Check backend route.",
-        );
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Signup failed");
       }
 
-      if (!res.ok) throw new Error(data?.error || "Signup failed");
+      // store token
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
 
-      // ✅ DO NOT auto-login. Just show message + redirect to login.
-      setSuccess("Account created successfully! Redirecting to login…");
+      // store user
+      if (data.user) {
+        localStorage.setItem("customer", JSON.stringify(data.user));
+      }
 
-      // optional: clear form
+      setSuccess(`Account created for ${data.user.name}!`);
+
       setName("");
       setEmail("");
       setPassword("");
 
-      setTimeout(() => navigate("/customer-login"), 1200);
+      setTimeout(() => {
+        navigate("/customer-login");
+      }, 1200);
+
     } catch (err) {
       setError(err.message || "Signup failed");
     } finally {
@@ -63,78 +70,53 @@ export default function CustomerSignup() {
 
   return (
     <div className="page">
-      <style>{css}</style>
+      <style>{css}</style>        
+      <h2>Customer Signup</h2>
 
-      <div className="topBar">
-        <div className="topBarInner">
-          <button className="backBtn" onClick={() => navigate(-1)}>
-            ‹
+        {error && <div style={styles.error}>{error}</div>}
+        {success && <div style={styles.success}>{success}</div>}
+
+        <form onSubmit={onSignup} style={styles.form}>
+          <input
+            style={styles.input}
+            placeholder="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+
+          <input
+            style={styles.input}
+            placeholder="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+
+          <input
+            style={styles.input}
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+
+          <button style={styles.button} disabled={loading}>
+            {loading ? "Creating..." : "Create Account"}
           </button>
-          <div className="topTitle">Customer Signup</div>
-          <div style={{ width: 36 }} />
-        </div>
-      </div>
+        </form>
 
-      <div className="wrap">
-        <div className="card">
-          <div className="head">
-            <div className="logo">🛡️</div>
-            <div>
-              <div className="h1">Create account</div>
-              <div className="sub">Save tickets & track progress</div>
-            </div>
-          </div>
-
-          {error && <div className="err">{error}</div>}
-          {success && <div className="ok">{success}</div>}
-
-          <form onSubmit={onSignup} className="form">
-            <label className="label">Name</label>
-            <input
-              className="input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              required
-            />
-
-            <label className="label">Email</label>
-            <input
-              className="input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@gmail.com"
-              type="email"
-              required
-            />
-
-            <label className="label">Password</label>
-            <input
-              className="input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Create a password"
-              type="password"
-              required
-            />
-
-            <button className="btn" disabled={loading}>
-              {loading ? "Creating..." : "Create Account"}
-            </button>
-          </form>
-
-          <div className="foot">
-            Already have an account?{" "}
-            <button
-              type="button"
-              className="linkBtn"
-              onClick={() => navigate("/customer-login")}
-            >
-              Login
-            </button>
-          </div>
-        </div>
-      </div>
+        <p>
+          Already have an account?{" "}
+          <button
+            style={styles.link}
+            onClick={() => navigate("/customer-login")}
+          >
+            Login
+          </button>
+        </p>
     </div>
   );
 }

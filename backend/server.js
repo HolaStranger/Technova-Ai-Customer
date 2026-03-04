@@ -24,9 +24,10 @@ const client = new CosmosClient({
 const database = client.database("customer-success-db");
 const ticketContainer = database.container("ticket-container");
 const customerContainer = database.container("customer-container");
-const warrantyContainer = database.container("warranty-container");
+const warrantyContainer = database.container("warranty-container"); //check warranty
 const adminContainer = database.container("admin-container");
-const chatHistoryContainer = database.container("chat-history-container");
+const chatHistoryContainer = database.container("chat-history-container"); //chat history
+const technicianContainer = database.container("technician-container");
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
 
@@ -44,15 +45,18 @@ function authRequired(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded; // { id, email, role }
     next();
-  } catch {
-    return res.status(401).json({ error: "Invalid/expired token" });
+  } catch (err) {
+  console.error("JWT error:", err.message);
+  return res.status(401).json({ error: "Invalid/expired token" });
+ 
   }
-}
+  }   
+
 
 async function findTicketByAnyId(id) {
   const query = {
     query:
-      "SELECT * FROM c WHERE c.id = @id OR c.ticketId = @id OFFSET 0 LIMIT 1",
+      "SELECT * FROM c WHERE c.id = @id OR c.ticketId = @id",
     parameters: [{ name: "@id", value: id }],
   };
   const { resources } = await ticketContainer.items.query(query).fetchAll();
@@ -91,68 +95,92 @@ async function getCustomerByEmail(email) {
  */
 async function createCustomerDoc({ name, email, passwordHash }) {
   const doc = {
-    id: email, // keep id=email
-    email, // keep email=email
+    id: email,
+    email,
     name,
     passwordHash,
     role: "customer",
     createdAt: new Date().toISOString(),
   };
 
-  // Try create normally (Cosmos SDK usually infers pk from doc)
   try {
     const { resource } = await customerContainer.items.create(doc);
     return resource;
+
   } catch (e1) {
-    // If container requires explicit partitionKey, try common options:
+
+    console.warn("Create failed, retrying with partitionKey=email", e1.message);
+
     try {
       const { resource } = await customerContainer.items.create(doc, {
         partitionKey: email,
       });
       return resource;
+
     } catch (e2) {
-      // last attempt: partitionKey = id (same as email anyway)
+
+      console.warn("Retry failed, trying partitionKey=id", e2.message);
+
       const { resource } = await customerContainer.items.create(doc, {
         partitionKey: doc.id,
       });
+
       return resource;
     }
   }
 }
-
 // ---------------- routes ----------------
 app.get("/ping", (req, res) => res.json({ message: "Backend is working ✅" }));
 app.get("/", (req, res) => {
-  res.json({ message: "Technova AI Customer Success Guardian Backend Running 🚀" });
+  res.json({ message: "Technova AI Customer Success Guardian Backend Running " });
 });
 // ✅ CUSTOMER SIGNUP
 // body: { name, email, password }
-app.post("/auth/signup", async (req, res) => {
+// ---------------- CUSTOMER SIGNUP ----------------
+
+app.post("/api/auth/signup", async (req, res) => {
+
   try {
+
     const name = String(req.body.name || "").trim();
     const email = String(req.body.email || "")
       .trim()
       .toLowerCase();
+
     const password = String(req.body.password || "");
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "Name, email, password required" });
-    }
+if (!name || !email || !password) {
+  return res.status(400).json({
+    error: "Name, email, password required"
+  });
+}
+
+if (!email.includes("@")) {
+  return res.status(400).json({
+    error: "Invalid email format"
+  });
+}
 
     const existing = await getCustomerByEmail(email);
+
     if (existing) {
-      return res.status(409).json({ error: "Email already registered" });
+      return res.status(409).json({
+        error: "Email already registered"
+      });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const created = await createCustomerDoc({ name, email, passwordHash });
+    const created = await createCustomerDoc({
+      name,
+      email,
+      passwordHash
+    });
 
-    // NOTE: You can still return token (frontend decides whether to auto-login)
     const token = createToken({
       id: created.id,
       email: created.email,
-      role: "customer",
+      role: created.role
     });
 
     res.status(201).json({
@@ -161,42 +189,54 @@ app.post("/auth/signup", async (req, res) => {
         id: created.id,
         name: created.name,
         email: created.email,
-        role: created.role,
-      },
+        role: created.role
+      }
     });
+
   } catch (err) {
-    res.status(500).json({ error: err?.message || "Signup failed" });
+
+    console.error(err);
+
+    res.status(500).json({
+      error: "Signup failed"
+    });
+
   }
+
 });
 
 // ✅ CUSTOMER LOGIN
 // body: { email, password }
-app.post("/auth/login", async (req, res) => {
-  try {
-    const email = String(req.body.email || "")
-      .trim()
-      .toLowerCase();
-    const password = String(req.body.password || "");
+app.post("/api/auth/login", async (req, res) => {
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email & password required" });
-    }
+  try {
+
+    const email = String(req.body.email || "").toLowerCase();
+    const password = String(req.body.password || "");
 
     const customer = await getCustomerByEmail(email);
 
     if (!customer) {
-      return res.status(401).json({ error: "Invalid email or password" });
+      return res.status(401).json({
+        error: "Invalid email or password"
+      });
     }
 
-    const ok = await bcrypt.compare(password, customer.passwordHash || "");
+    const ok = await bcrypt.compare(
+      password,
+      customer.passwordHash
+    );
+
     if (!ok) {
-      return res.status(401).json({ error: "Invalid email or password" });
+      return res.status(401).json({
+        error: "Invalid email or password"
+      });
     }
 
     const token = createToken({
       id: customer.id,
       email: customer.email,
-      role: "customer",
+      role: customer.role
     });
 
     res.json({
@@ -205,12 +245,20 @@ app.post("/auth/login", async (req, res) => {
         id: customer.id,
         name: customer.name,
         email: customer.email,
-        role: customer.role,
-      },
+        role: customer.role
+      }
     });
+
   } catch (err) {
-    res.status(500).json({ error: err?.message || "Login failed" });
-  }
+
+  console.error("Login error:", err);
+
+  res.status(500).json({
+    error: "Login failed"
+  });
+
+}
+
 });
 
 app.post("/api/technician/login", async (req, res) => {
@@ -244,6 +292,51 @@ app.post("/api/technician/login", async (req, res) => {
 
 });
 
+app.post("/api/admin/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const query = {
+      query: "SELECT * FROM c WHERE c.email = @email",
+      parameters: [
+        { name: "@email", value: email }
+      ]
+    };
+
+    const { resources } = await adminContainer.items
+      .query(query)
+      .fetchAll();
+
+    const admin = resources[0];
+
+    if (!admin) {
+      return res.status(401).json({
+        error: "Admin not found"
+      });
+    }
+
+    if (admin.password !== password) {
+      return res.status(401).json({
+        error: "Invalid password"
+      });
+    }
+
+    res.json({
+      admin: {
+        id: admin.id,
+        name: admin.name,
+        email: admin.email
+      }
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: "Server error"
+    });
+  }
+});
+
 // ✅ WHO AM I (test token)
 app.get("/auth/me", authRequired, (req, res) => res.json({ user: req.user }));
 
@@ -272,14 +365,26 @@ app.post("/tickets", async (req, res) => {
 });
 
 // ✅ GET ALL TICKETS
-app.get("/tickets", async (req, res) => {
+app.get("/api/tickets", async (req, res) => {
   try {
-    const query = "SELECT * FROM c ORDER BY c.createdAt DESC";
-    const { resources } = await ticketContainer.items.query(query).fetchAll();
+
+    const query = {
+      query: "SELECT * FROM c ORDER BY c.createdAt DESC"
+    };
+
+    const { resources } = await ticketContainer.items
+      .query(query)
+      .fetchAll();
+
     res.json(resources);
+
   } catch (err) {
-    res.status(500).json({ error: err?.message || "Load tickets failed" });
+
+    res.status(500).json({
+      error: err?.message || "Load tickets failed"
+    });
   }
+
 });
 
 // ✅ GET MY TICKETS (customer only)
@@ -317,31 +422,44 @@ app.get("/tickets/:id", async (req, res) => {
 
 // ✅ UPDATE STATUS
 app.put("/tickets/:id/status", async (req, res) => {
+
   try {
+
     const { status } = req.body;
-    if (!status) return res.status(400).json({ error: "Missing status" });
+
+    if (!status) {
+      return res.status(400).json({ error: "Missing status" });
+    }
 
     const existing = await findTicketByAnyId(req.params.id);
-    if (!existing) return res.status(404).json({ error: "Ticket not found" });
 
-    const pk = existing.ticketId || existing.id;
+    if (!existing) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    const partitionKey = existing.ticketId || existing.id;
 
     const updatedTicket = {
       ...existing,
-      ticketId: existing.ticketId || existing.id,
       status,
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     const { resource } = await ticketContainer
-      .item(existing.id, pk)
+      .item(existing.id, partitionKey)
       .replace(updatedTicket);
-    res.json(resource);
-  } catch (err) {
-    res.status(500).json({ error: err?.message || "Update status failed" });
-  }
-});
 
+    res.json(resource);
+
+  } catch (err) {
+
+    res.status(500).json({
+      error: err?.message || "Update status failed"
+    });
+
+  }
+
+});
 //  Viki updated
 // ==============================
 // SUPPORT SERVICE (Self-Fix Bot)

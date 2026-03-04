@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 export default function AdminLogin() {
   const navigate = useNavigate();
 
@@ -9,18 +11,38 @@ export default function AdminLogin() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (email === "admin@technova.com" && password === "admin123") {
+    try {
+      const res = await fetch(`${API}/api/admin/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          password
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Login failed");
+        return;
+      }
+
+      localStorage.setItem("admin", JSON.stringify(data.admin));
+
       navigate("/admin/dashboard");
-      return;
+
+    } catch (err) {
+      setError("Server error. Try again.");
     }
-
-    setError("Invalid email or password.");
   };
-
+  
   return (
     <div className="page">
       <style>{css}</style>

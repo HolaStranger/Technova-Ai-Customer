@@ -1,13 +1,29 @@
 Technician 
 Email: tech1@technova.com
 Password: tech123
+    "technician": {
+        "id": "TECH001",
+        "name": "John Tan",
+        "email": "tech1@technova.com"
+    }
 
 Email: tech2@technova.com
 Password: tech123
+    "technician": {
+        "id": "TECH002",
+        "name": "Arun Kumar",
+        "email": "tech2@technova.com"
+    }
+
 
 Admin
 Email: admin@technova.com
 Password: admin123
+    "admin": {
+        "id": "ADMIN001",
+        "name": "TechNova Admin",
+        "email": "admin@technova.com"
+    }
 
 User
 Email: user@technova.com

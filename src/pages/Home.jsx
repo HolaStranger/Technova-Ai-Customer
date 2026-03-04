@@ -95,7 +95,7 @@ export default function Home() {
 
           <div className="footer">
             Chin Hin AI Hackathon — Business Challenge 6 <br />
-            TechNova v1.0 Prototype
+            TechNova 
           </div>
         </div>
       </div>

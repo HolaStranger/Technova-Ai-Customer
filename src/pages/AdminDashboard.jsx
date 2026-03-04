@@ -56,24 +56,29 @@ export default function AdminDashboard() {
     );
   };
 
-  async function loadTickets() {
-    try {
-      setLoading(true);
-      setError("");
+async function loadTickets() {
+  try {
+    setError("");
 
-      const res = await fetch(`${API}/tickets`);
-      const data = await res.json();
+    const res = await fetch(`${API}/api/tickets`);
 
-      if (!res.ok) throw new Error(data?.error || "Failed to load tickets");
-
-      setTickets(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setTickets([]);
-      setError(e?.message || "Failed to fetch");
-    } finally {
-      setLoading(false);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err?.error || "Failed to load tickets");
     }
+
+    const data = await res.json();
+
+    setTickets(Array.isArray(data) ? data : []);
+
+  } catch (e) {
+    console.error("Ticket fetch error:", e);
+    setTickets([]);
+    setError(e.message || "Failed to fetch tickets");
+  } finally {
+    setLoading(false);
   }
+}
 
   useEffect(() => {
     loadTickets();

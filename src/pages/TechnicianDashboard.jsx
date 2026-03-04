@@ -9,12 +9,16 @@ export default function TechnicianDashboard() {
   const technicianEmail =
     localStorage.getItem("technician_email") || "Not signed in";
 
-  const [tab, setTab] = useState("all"); // all | active | done
+  const technicianId =
+    localStorage.getItem("technician_id") || "";
+
+  const [tab, setTab] = useState("all");
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
 
   async function loadTickets() {
     setLoading(true);
+
     try {
       const res = await fetch(`${API_BASE}/tickets`, {
         method: "GET",
@@ -22,25 +26,43 @@ export default function TechnicianDashboard() {
       });
 
       const contentType = res.headers.get("content-type") || "";
+
       if (!res.ok || !contentType.includes("application/json")) {
         setTickets([]);
         return;
       }
 
       const data = await res.json();
-      setTickets(Array.isArray(data) ? data : []);
-    } catch {
+
+      const sorted = Array.isArray(data)
+        ? [...data].sort(
+            (a, b) =>
+              new Date(b.createdAt) - new Date(a.createdAt)
+          )
+        : [];
+
+      setTickets(sorted);
+    } catch (err) {
       setTickets([]);
     } finally {
       setLoading(false);
     }
   }
 
+  // load immediately
   useEffect(() => {
     loadTickets();
   }, []);
 
-  // ✅ normalize helpers
+  // auto refresh every 10s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadTickets();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const norm = (s) => String(s || "open").toLowerCase();
 
   const isDone = (t) => {
@@ -54,23 +76,36 @@ export default function TechnicianDashboard() {
     );
   };
 
-  const isActive = (t) => !isDone(t); // Open + In Progress are Active
+  const isActive = (t) => !isDone(t);
 
+  // stats only for this technician
   const stats = useMemo(() => {
-    const total = tickets.length;
-    const done = tickets.filter(isDone).length;
-    const active = tickets.filter(isActive).length;
-    return { active, done, total };
-  }, [tickets]);
+    const myTickets = tickets.filter(
+      (t) => t.technicianId === technicianId
+    );
 
+    const total = myTickets.length;
+    const done = myTickets.filter(isDone).length;
+    const active = myTickets.filter(isActive).length;
+
+    return { active, done, total };
+  }, [tickets, technicianId]);
+
+  // filter ticket tabs
   const assignedTickets = useMemo(() => {
-    if (tab === "active") return tickets.filter(isActive);
-    if (tab === "done") return tickets.filter(isDone);
-    return tickets;
-  }, [tickets, tab]);
+    const myTickets = tickets.filter(
+      (t) => t.technicianId === technicianId
+    );
+
+    if (tab === "active") return myTickets.filter(isActive);
+    if (tab === "done") return myTickets.filter(isDone);
+
+    return myTickets;
+  }, [tickets, tab, technicianId]);
 
   const handleLogout = () => {
     localStorage.removeItem("technician_email");
+    localStorage.removeItem("technician_id");
     navigate("/technician");
   };
 
@@ -80,11 +115,22 @@ export default function TechnicianDashboard() {
 
       <div className="topBar">
         <div className="topBarInner">
-          <button className="iconBtn" onClick={() => navigate("/")}>
+          <button
+            className="iconBtn"
+            onClick={() => navigate("/")}
+          >
             ‹
           </button>
-          <div className="topTitle">Technician Portal</div>
-          <button className="iconBtn" onClick={loadTickets} title="Refresh">
+
+          <div className="topTitle">
+            Technician Portal
+          </div>
+
+          <button
+            className="iconBtn"
+            onClick={loadTickets}
+            title="Refresh"
+          >
             ↻
           </button>
         </div>
@@ -94,41 +140,75 @@ export default function TechnicianDashboard() {
         <div className="profileCard">
           <div className="profileLeft">
             <div>
-              <div className="profileName">Technician</div>
-              <div className="profileRole">{technicianEmail}</div>
+              <div className="profileName">
+                Technician
+              </div>
+
+              <div className="profileRole">
+                {technicianEmail}
+              </div>
             </div>
           </div>
 
-          <button className="logoutBtn" onClick={handleLogout}>
+          <button
+            className="logoutBtn"
+            onClick={handleLogout}
+          >
             <span style={{ fontSize: 14 }}>⇦</span>
             Logout
           </button>
         </div>
 
         <div className="statsRow">
-          <div className="statCard" style={{ background: "#e9eef5" }}>
-            <div className="statNumber" style={{ color: "#0f5ea8" }}>
+          <div
+            className="statCard"
+            style={{ background: "#e9eef5" }}
+          >
+            <div
+              className="statNumber"
+              style={{ color: "#0f5ea8" }}
+            >
               {stats.active}
             </div>
-            <div className="statLabel">Active</div>
+            <div className="statLabel">
+              Active
+            </div>
           </div>
 
-          <div className="statCard" style={{ background: "#eafaf1" }}>
-            <div className="statNumber" style={{ color: "#16a34a" }}>
+          <div
+            className="statCard"
+            style={{ background: "#eafaf1" }}
+          >
+            <div
+              className="statNumber"
+              style={{ color: "#16a34a" }}
+            >
               {stats.done}
             </div>
-            <div className="statLabel">Done</div>
+            <div className="statLabel">
+              Done
+            </div>
           </div>
 
-          <div className="statCard" style={{ background: "#fff6e5" }}>
-            <div className="statNumber" style={{ color: "#f59e0b" }}>
+          <div
+            className="statCard"
+            style={{ background: "#fff6e5" }}
+          >
+            <div
+              className="statNumber"
+              style={{ color: "#f59e0b" }}
+            >
               {stats.total}
             </div>
-            <div className="statLabel">Total</div>
+            <div className="statLabel">
+              Total
+            </div>
           </div>
         </div>
 
-        <div className="sectionTitle">ASSIGNED TICKETS</div>
+        <div className="sectionTitle">
+          ASSIGNED TICKETS
+        </div>
 
         <div className="tabs">
           <Tab
@@ -136,11 +216,13 @@ export default function TechnicianDashboard() {
             active={tab === "all"}
             onClick={() => setTab("all")}
           />
+
           <Tab
             label="Active"
             active={tab === "active"}
             onClick={() => setTab("active")}
           />
+
           <Tab
             label="Done"
             active={tab === "done"}
@@ -151,27 +233,45 @@ export default function TechnicianDashboard() {
         <div className="list">
           {loading && (
             <div className="stateBox">
-              <div className="stateTitle">Loading…</div>
-              <div className="stateText">Fetching tickets.</div>
-            </div>
-          )}
+              <div className="stateTitle">
+                Loading…
+              </div>
 
-          {!loading && assignedTickets.length === 0 && (
-            <div className="stateBox">
-              <div className="stateTitle">No tickets yet</div>
               <div className="stateText">
-                When a customer creates an issue, it will appear here.
+                Fetching tickets.
               </div>
             </div>
           )}
 
           {!loading &&
+            assignedTickets.length === 0 && (
+              <div className="stateBox">
+                <div className="stateTitle">
+                  No tickets yet
+                </div>
+
+                <div className="stateText">
+                  When a customer creates an
+                  issue, it will appear here.
+                </div>
+              </div>
+            )}
+
+          {!loading &&
             assignedTickets.map((t) => (
               <TicketCard
-                key={String(t?.ticketId || t?.id)}
+                key={
+                  t?.ticketId ||
+                  t?.id ||
+                  Math.random()
+                }
                 t={t}
                 onOpen={() =>
-                  navigate(`/admin/tickets/${t?.ticketId || t?.id}?role=tech`)
+                  navigate(
+                    `/admin/tickets/${
+                      t?.ticketId || t?.id
+                    }?role=tech`
+                  )
                 }
               />
             ))}
@@ -186,7 +286,9 @@ function Tab({ label, active, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`tab ${active ? "tabActive" : ""}`}
+      className={`tab ${
+        active ? "tabActive" : ""
+      }`}
     >
       {label}
     </button>
@@ -195,14 +297,22 @@ function Tab({ label, active, onClick }) {
 
 function TicketCard({ t, onOpen }) {
   const ticketId = t?.ticketId || t?.id;
+
   const customerName = t?.customerName || "—";
+
   const phone = t?.phone || "";
+
   const date = t?.createdAt || t?.updatedAt || "";
-  const desc = t?.issue || "";
 
-  const status = String(t?.status || "Open").toLowerCase();
+  const desc =
+    t?.issueDescription ||
+    t?.issue ||
+    "";
 
-  // ✅ NEW FLOW: Open / In Progress / Resolved (+ Self-Fixed etc.)
+  const status = String(
+    t?.status || "Open"
+  ).toLowerCase();
+
   const isDone =
     status.includes("resolved") ||
     status.includes("fixed") ||
@@ -211,36 +321,67 @@ function TicketCard({ t, onOpen }) {
     status === "done";
 
   const isInProgress =
-    status.includes("in progress") || status.includes("in_progress");
+    status.includes("in progress") ||
+    status.includes("in_progress");
 
-  const statusLabel = isDone ? "Done" : isInProgress ? "In Progress" : "Open";
+  const statusLabel = isDone
+    ? "Resolved"
+    : isInProgress
+    ? "In Progress"
+    : "Open";
 
   const statusPill = isDone
     ? "pillGreen"
     : isInProgress
-      ? "pillOrange"
-      : "pillBlue";
+    ? "pillOrange"
+    : "pillBlue";
 
   return (
-    <div className="ticketCard" onClick={onOpen} role="button" tabIndex={0}>
+    <div
+      className="ticketCard"
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+    >
       <div className="ticketTopRow">
-        <div className="ticketId">{ticketId ? String(ticketId) : "—"}</div>
-        <div className={`pill ${statusPill}`}>{statusLabel}</div>
+        <div className="ticketId">
+          {ticketId
+            ? String(ticketId)
+            : "—"}
+        </div>
+
+        <div className={`pill ${statusPill}`}>
+          {statusLabel}
+        </div>
       </div>
 
-      <div className="ticketCustomer">{customerName}</div>
+      <div className="ticketCustomer">
+        {customerName}
+      </div>
 
       <div className="ticketMeta">
-        {phone ? <div className="metaLine">📞 {phone}</div> : null}
-        {date ? (
-          <div className="metaLine">🗓️ {String(date).slice(0, 16)}</div>
-        ) : null}
+        {phone && (
+          <div className="metaLine">
+            📞 {phone}
+          </div>
+        )}
+
+        {date && (
+          <div className="metaLine">
+            🗓️{" "}
+            {new Date(date).toLocaleString()}
+          </div>
+        )}
       </div>
 
-      {desc ? <div className="ticketDesc">🧾 {desc}</div> : null}
+      {desc && (
+        <div className="ticketDesc">
+          🧾 {desc}
+        </div>
+      )}
     </div>
   );
-}
+} 
 
 const css = `
   *{ box-sizing:border-box; }

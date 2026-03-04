@@ -204,8 +204,7 @@ export default function CustomerChat() {
         </div>
 
         <div className="footer">
-          TechNova — Hackathon Demo <br />
-          v1.0 Prototype
+          TechNova Ai Hackathon 
         </div>
       </div>
     </div>
