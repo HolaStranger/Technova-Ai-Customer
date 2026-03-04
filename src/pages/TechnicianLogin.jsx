@@ -1,31 +1,61 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 export default function TechnicianLogin() {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    if (email === "tech@technova.com" && password === "tech123") {
-      localStorage.setItem("technician_email", email);
+    try {
+      const res = await fetch(`${API}/api/technician/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          password
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Login failed");
+        setLoading(false);
+        return;
+      }
+
+      // store technician info
+      localStorage.setItem("technician_email", data.technician.email);
+      localStorage.setItem("technician_id", data.technician.id);
+      localStorage.setItem("technician_name", data.technician.name);
+
       navigate("/technician/dashboard");
-      return;
+
+    } catch (err) {
+      setError("Server connection error");
     }
 
-    setError("Invalid email or password.");
+    setLoading(false);
   };
 
   return (
     <div className="page">
       <style>{css}</style>
 
-      {/* Full-width top bar */}
+      {/* Top bar */}
       <div className="topBar">
         <div className="topBarInner">
           <button className="backBtn" onClick={() => navigate("/")}>
@@ -36,7 +66,6 @@ export default function TechnicianLogin() {
         </div>
       </div>
 
-      {/* Normal web layout */}
       <div className="wrap">
         <div className="card">
           <div className="logoBox">🧰</div>
@@ -45,6 +74,7 @@ export default function TechnicianLogin() {
           <div className="subtitle">Company access required</div>
 
           <form onSubmit={handleLogin} className="form">
+
             <div className="inputWrap">
               <span className="inputIcon">✉️</span>
               <input
@@ -53,6 +83,7 @@ export default function TechnicianLogin() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Company email"
                 type="email"
+                required
               />
             </div>
 
@@ -63,23 +94,25 @@ export default function TechnicianLogin() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
-                type="password"
+                type={showPassword ? "text" : "password"}
+                required
               />
+              <button
+                type="button"
+                className="eyeBtn"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? "👁️" : "🙈"}
+              </button>
             </div>
 
             {error && <div className="error">{error}</div>}
 
-            <button type="submit" className="signInBtn">
-              ➜ Sign In
+            <button type="submit" className="signInBtn" disabled={loading}>
+              {loading ? "Signing In..." : "➜ Sign In"}
             </button>
-          </form>
 
-          {/* Optional: keep demo credentials */}
-          <div className="demoBox">
-            <div className="demoTitle">DEMO CREDENTIALS</div>
-            <div className="demoText">Email: tech@technova.com</div>
-            <div className="demoText">Password: tech123</div>
-          </div>
+          </form>
         </div>
       </div>
     </div>
@@ -252,6 +285,15 @@ const css = `
     font-weight:600;
     color:#64748b;
     margin-top:4px;
+  }
+
+  .eyeBtn{
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:16px;
+    padding:0 4px;
+    opacity: 0.6;
   }
 
   /* ✅ Mobile: full screen, compact */

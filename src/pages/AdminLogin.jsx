@@ -7,6 +7,7 @@ export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -60,8 +61,16 @@ export default function AdminLogin() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
-                type="password"
+                type={showPassword ? "text" : "password"}
               />
+              <button
+                type="button"
+                className="eyeBtn"
+                onClick={() => setShowPassword(!showPassword)}
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? "👁️" : "🙈"}
+              </button>
             </div>
 
             {error && <div className="error">{error}</div>}
@@ -71,11 +80,7 @@ export default function AdminLogin() {
             </button>
           </form>
 
-          <div className="demoBox">
-            <div className="demoTitle">DEMO CREDENTIALS</div>
-            <div className="demoText">Email: admin@technova.com</div>
-            <div className="demoText">Password: admin123</div>
-          </div>
+
         </div>
       </div>
     </div>
@@ -236,6 +241,15 @@ const css = `
     font-weight:600;
     color:#64748b;
     margin-top:4px;
+  }
+
+  .eyeBtn{
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:16px;
+    padding:0 4px;
+    opacity: 0.6;
   }
 
   /* 🔥 MOBILE OPTIMIZATION */

@@ -1,0 +1,14 @@
+Technician 
+Email: tech1@technova.com
+Password: tech123
+
+Email: tech2@technova.com
+Password: tech123
+
+Admin
+Email: admin@technova.com
+Password: admin123
+
+User
+Email: user@technova.com
+Password: user123

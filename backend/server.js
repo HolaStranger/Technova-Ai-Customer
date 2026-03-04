@@ -24,6 +24,9 @@ const client = new CosmosClient({
 const database = client.database("customer-success-db");
 const ticketContainer = database.container("ticket-container");
 const customerContainer = database.container("customer-container");
+const warrantyContainer = database.container("warranty-container");
+const adminContainer = database.container("admin-container");
+const chatHistoryContainer = database.container("chat-history-container");
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
 
@@ -210,6 +213,38 @@ app.post("/auth/login", async (req, res) => {
   }
 });
 
+app.post("/api/technician/login", async (req, res) => {
+
+  const { email, password } = req.body;
+
+  const query = {
+    query: "SELECT * FROM c WHERE c.email = @email",
+    parameters: [{ name: "@email", value: email }]
+  };
+
+  const { resources } = await technicianContainer.items.query(query).fetchAll();
+
+  if (!resources.length) {
+    return res.status(401).json({ error: "Technician not found" });
+  }
+
+  const tech = resources[0];
+
+  if (tech.password !== password) {
+    return res.status(401).json({ error: "Invalid password" });
+  }
+
+  res.json({
+    technician: {
+      id: tech.id,
+      name: tech.name,
+      email: tech.email
+    }
+  });
+
+});
+
+// ✅ WHO AM I (test token)
 app.get("/auth/me", authRequired, (req, res) => res.json({ user: req.user }));
 
 // ✅ CREATE TICKET

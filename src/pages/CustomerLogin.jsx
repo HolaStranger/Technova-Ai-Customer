@@ -9,6 +9,7 @@ export default function CustomerLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -75,13 +76,22 @@ export default function CustomerLogin() {
             />
 
             <label className="label">Password</label>
-            <input
-              className="input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              required
-            />
+            <div className="pwdWrap">
+              <input
+                className="input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type={showPassword ? "text" : "password"}
+                required
+              />
+              <button
+                type="button"
+                className="eyeBtn"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? "👁️" : "🙈"}
+              </button>
+            </div>
 
             <button className="btn" disabled={loading}>
               {loading ? "Logging in..." : "Login"}
@@ -181,6 +191,20 @@ const css = `
   .input:focus{
     border-color: rgba(59,130,246,.55);
     box-shadow: 0 0 0 3px rgba(59,130,246,.18);
+  }
+
+  .pwdWrap{ position:relative; }
+  .pwdWrap .input{ width:100%; padding-right:38px; }
+  .eyeBtn{
+    position:absolute;
+    right:8px;
+    top:50%;
+    transform:translateY(-50%);
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:16px;
+    color:#94a3b8;
   }
 
   .btn{
