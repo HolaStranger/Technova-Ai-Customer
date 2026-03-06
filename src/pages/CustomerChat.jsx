@@ -1,7 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { getToken, getUser, clearAuth } from "../auth";
+
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
 export default function CustomerChat() {
   const navigate = useNavigate();
@@ -10,67 +13,125 @@ export default function CustomerChat() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const token = localStorage.getItem("customer_token") || "";
+  const token = getToken();
+const user = getUser();
+const customerName = user?.name || "Customer";
+
+  /* =========================
+     LOGOUT FUNCTION
+  ========================= */
 
   const logout = () => {
-    localStorage.removeItem("customer_token");
-    localStorage.removeItem("customer_email");
-    localStorage.removeItem("customer_user");
-    navigate("/customer-access");
+    clearAuth();
+
+    // force refresh to clear session
+    window.location.href = "/customer-login";
   };
 
-  async function loadTickets() {
+  /* =========================
+     AUTH CHECK
+  ========================= */
+
+  useEffect(() => {
+    if (!token) {
+      navigate("/customer-login", { replace: true });
+    }
+  }, [token, navigate]);
+  /* =========================
+     LOAD CUSTOMER TICKETS
+  ========================= */
+
+  const loadTickets = async () => {
+
+    if (!token) {
+      logout();
+      return;
+    }
+
     try {
+
       setLoading(true);
       setError("");
 
-      // ✅ must be logged in
-      if (!token) {
-        navigate("/customer-access");
-        return;
-      }
-
-      // ✅ customer-only endpoint
-      const res = await fetch(`${API}/tickets/my`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`${API}/api/tickets/my`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
 
-      // backend might return HTML error in rare cases, so guard json parsing
-      const text = await res.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = { error: text };
-      }
-
-      if (!res.ok) {
-        // token invalid/expired OR server error
+      if (res.status === 401) {
         logout();
         return;
       }
 
-      setTickets(Array.isArray(data) ? data : []);
-    } catch (e) {
+      const data = await res.json();
+
+      if (Array.isArray(data)) {
+        setTickets(data);
+      } else {
+        setTickets([]);
+      }
+
+    } catch (err) {
+
+      setError("Failed to fetch tickets");
       setTickets([]);
-      setError(e?.message || "Failed to fetch tickets");
+
     } finally {
+
       setLoading(false);
+
     }
-  }
+  };
+  /* =========================
+     LOAD ON PAGE START
+  ========================= */
 
   useEffect(() => {
     loadTickets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* =========================
+     SESSION TIMEOUT
+  ========================= */
+
+  useEffect(() => {
+    let timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timeout);
+
+      timeout = setTimeout(() => {
+        logout();
+      }, SESSION_TIMEOUT);
+    };
+
+    const events = ["mousemove", "keydown", "click", "scroll"];
+
+    events.forEach((event) =>
+      window.addEventListener(event, resetTimer)
+    );
+
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeout);
+      events.forEach((event) =>
+        window.removeEventListener(event, resetTimer)
+      );
+    };
+  }, []);
+
+  // 📊 Ticket statistics
   const stats = useMemo(() => {
     const total = tickets.length;
 
     const selfFixed = tickets.filter((t) => {
       const s = String(t?.status || "").toLowerCase();
       return (
-        s.includes("self") || s.includes("fixed") || s.includes("resolved")
+        s.includes("self") ||
+        s.includes("fixed") ||
+        s.includes("resolved")
       );
     }).length;
 
@@ -89,73 +150,137 @@ export default function CustomerChat() {
 
   return (
     <div className="page">
-      <style>{css}</style>
+    <style>{css}</style>
 
       <div className="topBar">
         <div className="topBarInner">
-          <button className="backBtn" onClick={() => navigate("/")}>
+
+          <button
+            className="backBtn"
+            onClick={() => navigate("/")}
+          >
             ‹
           </button>
-          <div className="topTitle">TechNova AI Guardian</div>
-          <button className="logoutBtnTop" onClick={logout}>
+
+          <div className="topTitle">
+            TechNova AI Guardian
+          </div>
+
+          <button
+            className="logoutBtnTop"
+            onClick={logout}
+          >
             ⎋ Logout
           </button>
+
         </div>
       </div>
 
       <div className="contentWrap">
+
         <div className="hero">
+          
           <div className="logoBox">🛡️</div>
+
           <div className="mainTitle">TechNova AI</div>
-          <div className="subtitle">Customer Success Guardian</div>
-          <div className="onlineBadge">🟢 Agent Online</div>
+
+          <div className="subtitle">
+              Welcome, {customerName}
+
+          </div>
+
+          <div className="onlineBadge">
+            🟢 Agent Online
+          </div>
 
           <div className="apiStatusRow">
-            {loading && <span className="apiPill">Loading tickets…</span>}
+
+            {loading && (
+              <span className="apiPill">
+                Loading tickets…
+              </span>
+            )}
+
             {!loading && !error && (
-              <span className="apiPill apiPillOk">Connected ✅</span>
+              <span className="apiPill apiPillOk">
+                Connected ✅
+              </span>
             )}
+
             {error && (
-              <span className="apiPill apiPillErr">Error: {error}</span>
+              <span className="apiPill apiPillErr">
+                Error: {error}
+              </span>
             )}
+
             <button
               className="refreshBtn"
               onClick={loadTickets}
-              title="Refresh"
             >
               ↻
             </button>
+
           </div>
         </div>
 
-        <div className="primaryCard" onClick={() => navigate("/voice-call")}>
+        {/* Voice call */}
+        <div
+          className="primaryCard"
+          onClick={() => navigate("/voice-call")}
+        >
           <div className="cardLeft">
+
             <div className="iconCircle">📞</div>
+
             <div>
-              <div className="cardTitle">Start Voice Support Call</div>
-              <div className="cardDesc">Speak with our agent in real-time</div>
+              <div className="cardTitle">
+                Start Voice Support Call
+              </div>
+
+              <div className="cardDesc">
+                Speak with our agent in real-time
+              </div>
             </div>
+
           </div>
+
           <div className="chev">›</div>
+
         </div>
 
+        {/* Chat support */}
         <div
           className="secondaryCard"
           onClick={() => navigate("/chat-support")}
         >
           <div className="cardLeft">
-            <div className="iconCircle iconCircleChat">💬</div>
-            <div>
-              <div className="cardTitleDark">Chat Support</div>
-              <div className="cardDescDark">Text-based assistance</div>
+
+            <div className="iconCircle iconCircleChat">
+              💬
             </div>
+
+            <div>
+              <div className="cardTitleDark">
+                Chat Support
+              </div>
+
+              <div className="cardDescDark">
+                Text-based assistance
+              </div>
+            </div>
+
           </div>
+
           <div className="chev chevMuted">›</div>
+
         </div>
 
-        <div className="sectionLabel">SERVICE OVERVIEW</div>
+        <div className="sectionLabel">
+          SERVICE OVERVIEW
+        </div>
 
         <div className="overviewRow">
+
           <div
             className="statCard statBlue"
             onClick={() => navigate("/my-tickets?filter=active")}
@@ -182,30 +307,42 @@ export default function CustomerChat() {
             <div className="statNumber">{stats.total}</div>
             <div className="statLabel">Total</div>
           </div>
+
         </div>
 
         <div className="howBox">
-          <div className="howTitle">How It Works</div>
+
+          <div className="howTitle">
+            How It Works
+          </div>
 
           <div className="stepRow">
             <div className="stepCircle stepBlue">1</div>
-            <div className="stepText">Explain your issue</div>
+            <div className="stepText">
+              Explain your issue
+            </div>
           </div>
 
           <div className="stepRow">
             <div className="stepCircle stepBlue">2</div>
-            <div className="stepText">We record your details</div>
+            <div className="stepText">
+              We record your details
+            </div>
           </div>
 
           <div className="stepRow" style={{ marginBottom: 0 }}>
             <div className="stepCircle stepGreen">3</div>
-            <div className="stepText">Track progress in My Tickets</div>
+            <div className="stepText">
+              Track progress in My Tickets
+            </div>
           </div>
+
         </div>
 
         <div className="footer">
-          TechNova Ai Hackathon 
+          TechNova AI Hackathon
         </div>
+
       </div>
     </div>
   );

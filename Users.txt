@@ -28,3 +28,7 @@ Password: admin123
 User
 Email: user@technova.com
 Password: user123
+
+Email: risha@gmail.com
+Password: risha123
+

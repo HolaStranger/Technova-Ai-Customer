@@ -25,10 +25,10 @@ export default function Home() {
           {/* ✅ Customer */}
           <div
             className="roleCard"
-            onClick={() => navigate("/customer-access")}
+            onClick={() => navigate("/customer-login")}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && navigate("/customer-access")}
+            onKeyDown={(e) => e.key === "Enter" && navigate("/customer-login")}
           >
             <div className="left">
               <div className="iconBox" style={{ background: "#e9f2ff" }}>
@@ -42,7 +42,7 @@ export default function Home() {
               </div>
             </div>
             <div className="right">
-              <span className="loginPill">Continue</span>
+              <span className="loginPill">Login</span>
               <span className="chev">›</span>
             </div>
           </div>

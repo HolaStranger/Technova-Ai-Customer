@@ -172,226 +172,230 @@ export default function VoiceCall() {
 }
 
 const css = `
-  *{ box-sizing:border-box; }
+*{ box-sizing:border-box; }
 
-  :root{
-    --bg: #f1f5f9;
-    --nav: #091a2d;
-    --panel: #0b1e35;
-    --panel2: #0a2038;
-    --stroke: rgba(255,255,255,.10);
-    --text: rgba(255,255,255,.92);
-    --muted: rgba(255,255,255,.72);
-  }
+:root{
+  --bg: #e6ebf0;
+  --nav: #1f63a7;
+  --panel: #f4f6f8;
+  --panel2: #eef2f6;
 
-  .page{
-    min-height:100vh;
-    background: var(--bg);
-    font-family: Arial, sans-serif;
-  }
+  --stroke: #d4dbe3;
 
-  .topBar{
-    background: var(--nav);
-    color:#fff;
-    position: sticky;
-    top:0;
-    z-index:10;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
+  --text: #1f2937;
+  --muted: #6b7280;
 
-  .topBarInner{
-    max-width: 980px;
-    margin: 0 auto;
-    padding: 14px 18px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-  }
+  --primary: #1e5fa0;
+  --primary-light: #e8f1fb;
 
-  .backBtn{
-    width:36px;
-    height:36px;
-    border-radius:10px;
-    border:none;
-    background:rgba(255,255,255,.12);
-    color:#fff;
-    font-size:22px;
-    cursor:pointer;
-  }
+  --success: #16a34a;
+  --danger: #ef4444;
+}
 
-  .topTitle{ font-weight:900; font-size:14px; }
+.page{
+  min-height:100vh;
+  background: var(--bg);
+  font-family: Arial, sans-serif;
+}
 
-  /* center the panel nicely */
-  .wrap{
-    max-width: 980px;
-    margin: 0 auto;
-    padding: 18px;
-  }
+/* Top bar */
+.topBar{
+  background: var(--nav);
+  color:#fff;
+  position: sticky;
+  top:0;
+  z-index:10;
+}
 
-  /* the call panel fills the viewport nicely (no giant empty space) */
+.topBarInner{
+  max-width:980px;
+  margin:0 auto;
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.backBtn{
+  width:36px;
+  height:36px;
+  border-radius:10px;
+  border:none;
+  background:rgba(255,255,255,.2);
+  color:#fff;
+  font-size:20px;
+  cursor:pointer;
+}
+
+.topTitle{
+  font-weight:900;
+  font-size:15px;
+}
+
+/* Layout wrapper */
+.wrap{
+  max-width:980px;
+  margin:0 auto;
+  padding:20px;
+}
+
+/* Chat panel */
+.panel{
+  background: var(--panel);
+  border-radius:18px;
+  border:1px solid var(--stroke);
+  box-shadow:0 12px 28px rgba(0,0,0,0.08);
+  overflow:hidden;
+
+  display:flex;
+  flex-direction:column;
+
+  height:calc(100vh - 90px);
+  min-height:520px;
+}
+
+/* Call info header */
+.callInfo{
+  padding:14px 16px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background: var(--panel2);
+  border-bottom:1px solid var(--stroke);
+}
+
+.callLeft{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.dot{
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  background:var(--success);
+}
+
+.callName{
+  font-size:13px;
+  font-weight:900;
+}
+
+.callTime{
+  font-size:13px;
+  color:var(--muted);
+}
+
+.readyPill{
+  font-size:12px;
+  font-weight:800;
+  padding:6px 12px;
+  border-radius:999px;
+  background:#d1fae5;
+  color:#065f46;
+}
+
+/* Chat area */
+.chatArea{
+  flex:1;
+  padding:16px;
+  overflow:auto;
+}
+
+/* AI message */
+.agentTag{
+  font-size:10px;
+  letter-spacing:.8px;
+  color:#1e5fa0;
+  font-weight:900;
+  margin-bottom:6px;
+}
+
+.agentBubble{
+  max-width:720px;
+  background:#e9eef4;
+  padding:12px 14px;
+  border-radius:14px;
+  font-size:13px;
+  line-height:1.45;
+}
+
+/* User message */
+.userBubble{
+  margin-top:12px;
+  margin-left:auto;
+  max-width:720px;
+  background:var(--primary-light);
+  border:1px solid #cfe2ff;
+  padding:12px 14px;
+  border-radius:14px;
+}
+
+.userTag{
+  font-size:10px;
+  letter-spacing:.8px;
+  color:var(--muted);
+  font-weight:900;
+  margin-bottom:6px;
+}
+
+.userText{
+  font-size:13px;
+  line-height:1.45;
+}
+
+/* Bottom controls */
+.controls{
+  background: var(--panel2);
+  border-top:1px solid var(--stroke);
+  padding:16px;
+  display:grid;
+  place-items:center;
+  gap:10px;
+}
+
+/* Mic button */
+.micBtn{
+  width:64px;
+  height:64px;
+  border-radius:999px;
+  border:none;
+  background:var(--primary);
+  color:#fff;
+  font-size:24px;
+  cursor:pointer;
+  box-shadow:0 8px 18px rgba(30,95,160,.3);
+}
+
+.tapText{
+  color:var(--muted);
+  font-size:12px;
+}
+
+/* End call */
+.endBtn{
+  width:min(520px,100%);
+  border:none;
+  border-radius:12px;
+  padding:12px;
+  background:var(--danger);
+  color:#fff;
+  font-weight:900;
+  cursor:pointer;
+}
+
+/* Mobile */
+@media (max-width:768px){
+  .wrap{ padding:0; }
+
   .panel{
-    background: var(--panel);
-    border-radius: 18px;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    box-shadow: 0 18px 40px rgba(15,23,42,.12);
-    overflow: hidden;
-
-    /* layout */
-    display: flex;
-    flex-direction: column;
-
-    /* key part: good height on desktop */
-    height: calc(100vh - 72px - 36px); /* topbar + wrap padding */
-    min-height: 520px;
-  }
-
-  .callInfo{
-    padding: 14px 16px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    color: var(--text);
-    background: var(--panel2);
-    border-bottom: 1px solid var(--stroke);
-  }
-
-  .callLeft{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    flex-wrap:wrap;
-  }
-
-  .dot{
-    width:8px; height:8px;
-    border-radius:999px;
-    background:#10b981;
-    display:inline-block;
-  }
-
-  .callName{ font-size:13px; font-weight:900; }
-  .callTime{ font-size:13px; opacity:.85; }
-
-  .readyPill{
-    font-size:12px;
-    font-weight:800;
-    padding: 6px 12px;
-    border-radius: 999px;
-    background: rgba(255,255,255,.12);
-    white-space: nowrap;
-  }
-
-  /* chat fills available space and scrolls */
-  .chatArea{
-    flex: 1;
-    padding: 16px;
-    overflow: auto;
-  }
-  .chatArea::-webkit-scrollbar{ width: 10px; }
-  .chatArea::-webkit-scrollbar-thumb{
-    background: rgba(255,255,255,.10);
-    border-radius: 999px;
-  }
-
-  .agentTag{
-    font-size:10px;
-    letter-spacing:.8px;
-    color:#7dd3fc;
-    font-weight:900;
-    margin-bottom:8px;
-  }
-
-  .agentBubble{
-    max-width: 720px;
-    background: rgba(255,255,255,.10);
-    color: #fff;
-    padding: 12px 14px;
-    border-radius: 14px;
-    font-size: 13px;
-    line-height: 1.45;
-  }
-
-  .userBubble{
-    margin-top: 12px;
-    max-width: 720px;
-    margin-left: auto;
-    background: rgba(15, 94, 168, 0.25);
-    border: 1px solid rgba(59,130,246,.25);
-    color:#fff;
-    padding: 12px 14px;
-    border-radius: 14px;
-  }
-  .userTag{
-    font-size:10px;
-    letter-spacing:.8px;
-    color: rgba(255,255,255,.80);
-    font-weight:900;
-    margin-bottom:6px;
-  }
-  .userText{
-    font-size:13px;
-    line-height:1.45;
-    color: var(--text);
-    word-break: break-word;
-  }
-
-  /* controls pinned */
-  .controls{
-    background: var(--panel2);
-    border-top: 1px solid var(--stroke);
-    padding: 16px;
-    display: grid;
-    place-items: center;
-    gap: 10px;
-  }
-
-  .micBtn{
-    width: 64px;
-    height: 64px;
-    border-radius: 999px;
-    border: none;
-    display:grid;
-    place-items:center;
-    color:#fff;
-    font-size: 24px;
-    box-shadow: 0 12px 20px rgba(15, 94, 168, 0.25);
-    cursor:pointer;
-  }
-
-  .tapText{
-    color: var(--muted);
-    font-size: 12px;
-  }
-
-  .endBtn{
-    width: min(520px, 100%);
+    height:calc(100vh - 64px);
+    border-radius:0;
+    box-shadow:none;
     border:none;
-    border-radius: 12px;
-    padding: 12px 14px;
-    background: #ef4444;
-    color:#fff;
-    font-weight: 900;
-    cursor:pointer;
   }
 
-  .endedBox{
-    width:100%;
-    text-align:center;
-    color:#fff;
-    padding: 8px 0;
-  }
-  .endedTitle{ font-weight:900; font-size:14px; }
-  .endedSub{ margin-top:4px; font-size:12px; opacity:.85; }
-
-  /* ✅ Mobile: panel becomes full screen */
-  @media (max-width: 768px){
-    .wrap{ padding: 0; }
-    .panel{
-      height: calc(100vh - 64px);
-      border-radius: 0;
-      box-shadow: none;
-      border: none;
-    }
-    .topBarInner{ padding: 14px 14px; }
-  }
+  .topBarInner{ padding:14px; }
+}
 `;

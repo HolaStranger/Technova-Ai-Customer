@@ -4,7 +4,9 @@ import { useNavigate } from "react-router-dom";
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function ChatSupport() {
+
   const navigate = useNavigate();
+  const chatEndRef = useRef(null);
 
   const [step, setStep] = useState("menu");
 
@@ -12,7 +14,7 @@ export default function ChatSupport() {
     customerName: "",
     phone: "",
     serialNumber: "",
-    issue: "",
+    issue: ""
   });
 
   const [messages, setMessages] = useState([
@@ -23,73 +25,84 @@ export default function ChatSupport() {
         "1. Report an issue",
         "2. Check warranty",
         "3. Track technician"
-      ],
-    },
+      ]
+    }
   ]);
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const chatEndRef = useRef(null);
+  /* AUTO SCROLL */
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  /* CHAT HELPERS */
+
   const aiSay = (text, options = null) => {
-    setMessages((prev) => [...prev, { role: "ai", text, options }]);
+    setMessages(prev => [...prev, { role: "ai", text, options }]);
   };
 
+  const userSay = (text) => {
+    setMessages(prev => [...prev, { role: "user", text }]);
+  };
+
+  /* API CALL */
+
   const sendToBackend = async (endpoint, payload) => {
+
     const res = await fetch(`${API}${endpoint}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(text || "Server error");
+      throw new Error("Server error");
     }
 
-    return await res.json();
+    return res.json();
   };
 
+  /* MAIN MESSAGE HANDLER */
+
   const sendMessage = async (override = null) => {
+
     const userText = override ?? input;
 
     if (!userText.trim() || loading) return;
 
-    setMessages((prev) => [...prev, { role: "user", text: userText }]);
+    userSay(userText);
     setInput("");
 
     /* ================= MENU ================= */
 
     if (step === "menu") {
+
       if (userText.includes("1")) {
         setStep("name");
         aiSay("Please enter your full name.");
+        return;
       }
 
-      else if (userText.includes("2")) {
+      if (userText.includes("2")) {
         setStep("warranty");
         aiSay("Please enter your product serial number.");
+        return;
       }
 
-      else if (userText.includes("3")) {
+      if (userText.includes("3")) {
         setStep("track");
         aiSay("Please enter your Ticket ID.");
+        return;
       }
 
-      else {
-        aiSay("Please select one of the options.", [
-          "1. Report an issue",
-          "2. Check warranty",
-          "3. Track technician"
-        ]);
-      }
+      aiSay("Please choose an option.", [
+        "1. Report an issue",
+        "2. Check warranty",
+        "3. Track technician"
+      ]);
 
       return;
     }
@@ -97,7 +110,9 @@ export default function ChatSupport() {
     /* ================= WARRANTY ================= */
 
     if (step === "warranty") {
+
       try {
+
         setLoading(true);
         aiSay("Checking warranty status...");
 
@@ -106,19 +121,17 @@ export default function ChatSupport() {
         });
 
         if (data.inWarranty) {
-          aiSay(`✅ Your product is under warranty until ${data.expiryDate}.`);
+          aiSay(`✅ Warranty valid until ${data.expiryDate}`);
         } else {
-          aiSay(`❌ Warranty expired on ${data.expiryDate}.`);
+          aiSay(`❌ Warranty expired on ${data.expiryDate}`);
         }
 
-      } catch (err) {
-        aiSay("Unable to check warranty right now.");
+      } catch {
+        aiSay("Unable to check warranty.");
       }
 
-      finally {
-        setLoading(false);
-        setStep("menu");
-      }
+      setLoading(false);
+      setStep("menu");
 
       return;
     }
@@ -126,7 +139,9 @@ export default function ChatSupport() {
     /* ================= TRACK ================= */
 
     if (step === "track") {
+
       try {
+
         setLoading(true);
         aiSay("Tracking technician...");
 
@@ -134,20 +149,17 @@ export default function ChatSupport() {
           ticketId: userText
         });
 
-        aiSay(
-          `Technician: ${data.technicianName || "Not assigned"}\nETA: ${
-            data.estimatedArrival || "Not available"
-          }`
-        );
+        aiSay(`
+Technician: ${data.technicianName || "Not assigned"}
+ETA: ${data.estimatedArrival || "Unknown"}
+        `);
 
-      } catch (err) {
-        aiSay("Unable to track technician right now.");
+      } catch {
+        aiSay("Unable to track technician.");
       }
 
-      finally {
-        setLoading(false);
-        setStep("menu");
-      }
+      setLoading(false);
+      setStep("menu");
 
       return;
     }
@@ -155,30 +167,32 @@ export default function ChatSupport() {
     /* ================= ISSUE FLOW ================= */
 
     if (step === "name") {
-      setForm((p) => ({ ...p, customerName: userText }));
+      setForm(prev => ({ ...prev, customerName: userText }));
       setStep("phone");
       aiSay("Please enter your phone number.");
       return;
     }
 
     if (step === "phone") {
-      setForm((p) => ({ ...p, phone: userText }));
+      setForm(prev => ({ ...prev, phone: userText }));
       setStep("serial");
       aiSay("Please enter your product serial number.");
       return;
     }
 
     if (step === "serial") {
-      setForm((p) => ({ ...p, serialNumber: userText }));
+      setForm(prev => ({ ...prev, serialNumber: userText }));
       setStep("issue");
       aiSay("Please describe the issue.");
       return;
     }
 
     if (step === "issue") {
+
       try {
+
         setLoading(true);
-        aiSay("Processing your request...");
+        aiSay("Creating support ticket...");
 
         const data = await sendToBackend("/ai/orchestrate", {
           intent: "report_issue",
@@ -190,190 +204,314 @@ export default function ChatSupport() {
 
         aiSay(data.message || "Ticket created successfully.");
 
-        if (data.ticketId) {
-          setTimeout(() => navigate("/my-tickets?filter=active"), 800);
-        }
-
-      } catch (err) {
-        aiSay("Failed to process your request.");
+      } catch {
+        aiSay("Failed to create ticket.");
       }
 
-      finally {
-        setLoading(false);
-        setStep("menu");
-      }
+      setLoading(false);
+      setStep("menu");
 
-      return;
     }
+
   };
 
   return (
+
     <div className="page">
-      <div className="wrap">
 
-        <div className="chatArea">
-          {messages.map((msg, idx) => (
-            <div key={idx} className={msg.role === "user" ? "user" : "ai"}>
-              <p>{msg.text}</p>
+      <style>{css}</style>
 
-              {msg.options &&
-                msg.options.map((opt) => (
-                  <button key={opt} onClick={() => sendMessage(opt)}>
-                    {opt}
-                  </button>
-                ))}
-            </div>
-          ))}
+      {/* HEADER */}
 
-          {loading && <p>AI is thinking...</p>}
+      <div className="topBar">
 
-          <div ref={chatEndRef} />
+        <div className="topBarInner">
+
+          <button
+            className="backBtn"
+            onClick={() => navigate("/customer")}
+          >
+            ←
+          </button>
+
+          <div className="topTitle">
+            TechNova Support
+          </div>
+
+          <button
+            className="logoutBtnTop"
+            onClick={() => navigate("/customer")}
+          >
+            Home
+          </button>
+
         </div>
 
+      </div>
+
+      {/* CONTENT */}
+
+      <div className="contentWrap">
+
+        <div className="hero">
+
+          <div className="logoBox">🤖</div>
+
+          <div className="mainTitle">
+            AI Customer Support
+          </div>
+
+          <div className="onlineBadge">
+            AI Agent Online
+          </div>
+
+          <div className="subtitle">
+            TechNova Customer Success Guardian
+          </div>
+
+        </div>
+
+        {/* CHAT */}
+
+        <div className="chatBox">
+
+          {messages.map((msg, i) => (
+
+            <div
+              key={i}
+              className={msg.role === "user" ? "userBubble" : "aiBubble"}
+            >
+
+              <p>{msg.text}</p>
+
+              {msg.options && msg.options.map(opt => (
+
+                <button
+                  key={opt}
+                  className="optionBtn"
+                  onClick={() => sendMessage(opt)}
+                >
+                  {opt}
+                </button>
+
+              ))}
+
+            </div>
+
+          ))}
+
+          {loading && (
+
+            <div className="aiBubble">
+              <p className="typing">AI is typing...</p>
+            </div>
+
+          )}
+
+          <div ref={chatEndRef}></div>
+
+        </div>
+
+        {/* INPUT */}
+
         <div className="inputBar">
+
           <input
             value={input}
+            placeholder="Type your message..."
             disabled={loading}
-            placeholder="Type your response..."
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") sendMessage();
             }}
           />
 
-          <button disabled={loading} onClick={() => sendMessage()}>
+          <button
+            disabled={loading}
+            onClick={() => sendMessage()}
+          >
             Send
           </button>
+
         </div>
 
       </div>
+
     </div>
+
   );
+
 }
 
+/* ================= CSS ================= */
+
 const css = `
-  *{ box-sizing:border-box; }
 
-  :root{
-    --bg:#f1f5f9;
-    --nav:#0f5ea8;
-    --panel:#ffffff;
-    --stroke:#e5e7eb;
-    --text:#0f172a;
-    --muted:#6b7280;
-    --user:#0f5ea8;
-  }
+*{box-sizing:border-box}
 
-  .page{ min-height:100vh; background: var(--bg); font-family: Arial, sans-serif; }
+.page{
+height:100vh;
+background:#f1f5f9;
+font-family:Arial;
+display:flex;
+flex-direction:column
+}
 
-  .topBar{ background: var(--nav); color:#fff; position: sticky; top:0; z-index:10; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08); }
-  .topBarInner{ max-width: 980px; margin: 0 auto; padding: 14px 18px; display:flex; align-items:center; justify-content:space-between; }
-  .backBtn{ width:36px; height:36px; border-radius:10px; border:none; background:rgba(255,255,255,.15); color:#fff; font-size:22px; cursor:pointer; }
-  .topTitle{ font-weight:900; font-size:14px; }
+.topBar{
+background:#0f5ea8;
+color:#fff;
+box-shadow:0 8px 20px rgba(0,0,0,0.08)
+}
 
-  .wrap{ max-width: 980px; margin: 0 auto; padding: 18px; }
+.topBarInner{
+max-width:1100px;
+margin:auto;
+padding:14px 20px;
+display:flex;
+align-items:center;
+justify-content:space-between
+}
 
-  .panel{
-    background: var(--panel);
-    border-radius: 18px;
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    box-shadow: 0 18px 40px rgba(15,23,42,.08);
-    overflow: hidden;
-    display:flex;
-    flex-direction:column;
-    height: calc(100vh - 72px - 36px);
-    min-height: 520px;
-  }
+.backBtn{
+width:36px;
+height:36px;
+border-radius:10px;
+border:none;
+background:rgba(255,255,255,.15);
+color:#fff;
+font-size:20px;
+cursor:pointer
+}
 
-  .chatArea{
-    flex:1;
-    padding: 16px;
-    display:flex;
-    flex-direction:column;
-    gap: 10px;
-    overflow:auto;
-    background: #f8fafc;
-  }
+.logoutBtnTop{
+border:none;
+background:rgba(255,255,255,.15);
+color:#fff;
+font-weight:700;
+border-radius:10px;
+padding:8px 14px;
+cursor:pointer
+}
 
-  .bubble{
-    max-width: min(720px, 85%);
-    border-radius: 14px;
-    padding: 12px 14px;
-    font-size: 13px;
-    line-height: 1.45;
-    border: 1px solid rgba(0,0,0,0.06);
-  }
+.topTitle{
+font-weight:900
+}
 
-  .aiBubble{ align-self:flex-start; background:#fff; color:#111827; }
-  .userBubble{ align-self:flex-end; background: var(--user); color:#fff; border: 1px solid rgba(255,255,255,0.12); }
+.contentWrap{
+max-width:900px;
+margin:auto;
+padding:20px;
+display:flex;
+flex-direction:column;
+flex:1;
+width:100%
+}
 
-  .agentTag{ font-size: 10px; font-weight: 900; color: #16a34a; margin-bottom: 6px; letter-spacing: .4px; }
-  .bubbleText{ word-break: break-word; }
+.hero{
+text-align:center;
+margin-bottom:10px
+}
 
-  .optionBtns{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
-  .optBtn{
-    background: #e0f2fe; border:1px solid #bae6fd; color:#0284c7;
-    padding: 8px 12px; border-radius: 20px; font-size:12px; font-weight:700;
-    cursor:pointer; transition:0.2s;
-  }
-  .optBtn:hover{ background:#bae6fd; }
+.logoBox{
+width:64px;
+height:64px;
+border-radius:18px;
+background:#e8f0fe;
+display:grid;
+place-items:center;
+font-size:26px;
+margin:auto
+}
 
-  .errorBanner{
-    background:#fef2f2;
-    border:1px solid #fecaca;
-    color:#991b1b;
-    padding:10px 12px;
-    border-radius:12px;
-    font-weight:800;
-    font-size:12px;
-    align-self:flex-start;
-    max-width: 85%;
-  }
+.mainTitle{
+font-weight:900;
+font-size:26px
+}
 
-  .inputBar{
-    padding: 12px;
-    background: #fff;
-    border-top: 1px solid var(--stroke);
-    display:flex;
-    gap: 10px;
-    align-items:center;
-  }
+.onlineBadge{
+color:#16a34a;
+font-size:12px;
+font-weight:700
+}
 
-  .input{
-    flex:1;
-    padding: 10px 12px;
-    border-radius: 12px;
-    border: 1px solid var(--stroke);
-    outline: none;
-    font-size: 13px;
-    background: #fff;
-  }
+.subtitle{
+color:#6b7280;
+font-size:14px
+}
 
-  .input:focus{
-    border-color: rgba(59,130,246,.55);
-    box-shadow: 0 0 0 3px rgba(59,130,246,.18);
-  }
+.chatBox{
+flex:1;
+background:#fff;
+border-radius:16px;
+padding:18px;
+overflow-y:auto;
+border:1px solid #e5e7eb
+}
 
-  .sendBtn{
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    border:none;
-    background: var(--nav);
-    color:#fff;
-    cursor:pointer;
-    font-size: 16px;
-    font-weight: 900;
-  }
+.aiBubble{
+text-align:left;
+margin-bottom:14px
+}
 
-  .sendBtn:disabled, .input:disabled{
-    opacity: .6;
-    cursor: not-allowed;
-  }
+.aiBubble p{
+display:inline-block;
+background:#f1f5f9;
+border:1px solid #e5e7eb;
+padding:10px 14px;
+border-radius:12px;
+max-width:70%
+}
 
-  @media (max-width: 768px){
-    .wrap{ padding: 0; }
-    .panel{ height: calc(100vh - 64px); border-radius: 0; box-shadow: none; border: none; }
-    .topBarInner{ padding: 14px 14px; }
-  }
+.userBubble{
+text-align:right;
+margin-bottom:14px
+}
+
+.userBubble p{
+display:inline-block;
+background:#0f5ea8;
+color:#fff;
+padding:10px 14px;
+border-radius:12px;
+max-width:70%
+}
+
+.optionBtn{
+display:block;
+margin-top:6px;
+background:#fff;
+border:1px solid #e5e7eb;
+padding:7px 10px;
+border-radius:8px;
+cursor:pointer
+}
+
+.inputBar{
+display:flex;
+gap:10px;
+margin-top:12px
+}
+
+.inputBar input{
+flex:1;
+padding:10px;
+border-radius:10px;
+border:1px solid #e5e7eb
+}
+
+.inputBar button{
+background:#0f5ea8;
+color:#fff;
+border:none;
+padding:10px 16px;
+border-radius:10px;
+cursor:pointer
+}
+
+.typing{
+font-size:13px;
+color:#6b7280;
+font-style:italic
+}
+
 `;

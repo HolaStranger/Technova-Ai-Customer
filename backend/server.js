@@ -1,11 +1,11 @@
-// backend/server.js
-
 import express from "express";
+import nodemailer from "nodemailer";
 import cors from "cors";
 import dotenv from "dotenv";
 import { CosmosClient } from "@azure/cosmos";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import axios from "axios";
 
 dotenv.config();
 
@@ -28,8 +28,13 @@ const warrantyContainer = database.container("warranty-container"); //check warr
 const adminContainer = database.container("admin-container");
 const chatHistoryContainer = database.container("chat-history-container"); //chat history
 const technicianContainer = database.container("technician-container");
+const sparePartsContainer = database.container("spare-parts-container");
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
+
+
+const FOUNDRY_ENDPOINT = process.env.FOUNDRY_ENDPOINT;
+const FOUNDRY_API_KEY = process.env.FOUNDRY_API_KEY;
 
 // ---------------- helpers ----------------
 function createToken(payload) {
@@ -63,9 +68,68 @@ async function findTicketByAnyId(id) {
   return resources?.[0] || null;
 }
 
+function detectEmotion(text) {
+  const msg = text.toLowerCase();
+
+  if (
+    msg.includes("angry") ||
+    msg.includes("very bad") ||
+    msg.includes("terrible") ||
+    msg.includes("already called") ||
+    msg.includes("not working again") ||
+    msg.includes("complaint")
+  ) {
+    return "angry";
+  }
+
+  if (
+    msg.includes("problem") ||
+    msg.includes("issue") ||
+    msg.includes("not working")
+  ) {
+    return "frustrated";
+  }
+
+  return "neutral";
+}
+
+
+async function sendManagerEmail(ticket) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    }
+  });
+
+      const mailOptions = {
+        from: " Technova Support <technova.support@gmail.com>",
+        to: "manager@company.com",
+        subject: "⚠ High Priority Ticket – Angry Customer",
+        html: `
+        <h2 style="color:red;">⚠ High Priority Ticket</h2>
+
+        <p><strong>Customer:</strong> ${ticket.customerName}</p>
+        <p><strong>Email:</strong> ${ticket.customerEmail}</p>
+
+        <p><strong>Issue:</strong></p>
+        <p>${ticket.issue}</p>
+
+        <hr>
+
+        <p><strong>Emotion:</strong> ${ticket.emotion}</p>
+        <p><strong>Priority:</strong> ${ticket.priority}</p>
+        <p><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
+
+        <p>Please check the system immediately.</p>
+        `
+      };
+
+  await transporter.sendMail(mailOptions);
+}
 /**
- * ✅ IMPORTANT:
- * Cosmos partition key for customer-container might NOT be email.
+ * ✅ IMPORTANT: Cosmos partition key for customer-container might NOT be email.
  * So we do:
  * 1) try direct read with (id=email, pk=email)
  * 2) if fails, fallback to query by email
@@ -338,12 +402,39 @@ app.post("/api/admin/login", async (req, res) => {
 });
 
 // ✅ WHO AM I (test token)
-app.get("/auth/me", authRequired, (req, res) => res.json({ user: req.user }));
+app.get("/api/auth/me", authRequired, async (req, res) => {
+
+  const email = req.user.email;
+
+  const customer = await getCustomerByEmail(email);
+
+  if (!customer) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  res.json({
+    user: {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      role: customer.role
+    }
+  });
+
+});
+
 
 // ✅ CREATE TICKET
-app.post("/tickets", async (req, res) => {
+app.post("/api/tickets", async (req, res) => {
   try {
     const newId = Date.now().toString();
+
+    const emotion = detectEmotion(req.body.issue);
+
+    let priority = "Normal";
+    if (emotion === "angry") {
+      priority = "High";
+    }
 
     const ticket = {
       id: newId,
@@ -351,16 +442,25 @@ app.post("/tickets", async (req, res) => {
       customerName: req.body.customerName || "",
       customerEmail: String(req.body.customerEmail || "").toLowerCase(),
       issue: req.body.issue || "",
-      status: req.body.status || "Open",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...req.body,
+      emotion: emotion,
+      priority: priority,
+      status: "Open",
+      createdAt: new Date().toISOString()
     };
 
-    const { resource } = await ticketContainer.items.create(ticket);
-    res.status(201).json(resource);
-  } catch (err) {
-    res.status(500).json({ error: err?.message || "Create ticket failed" });
+    // 1️⃣ Save ticket to Cosmos DB
+  await ticketContainer.items.create(ticket);
+
+    // 2️⃣ If customer is angry → send email to manager
+    if (emotion === "angry") {
+      await sendManagerEmail(ticket);
+    }
+
+    // 3️⃣ Return response
+    res.json(ticket);
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -388,13 +488,13 @@ app.get("/api/tickets", async (req, res) => {
 });
 
 // ✅ GET MY TICKETS (customer only)
-app.get("/tickets/my", authRequired, async (req, res) => {
+app.get("/api/tickets/my", authRequired, async (req, res) => {
   try {
     if (req.user.role !== "customer") {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    const email = String(req.user.email || "").toLowerCase();
+    const email = String(req.user.email || "").trim().toLowerCase();
 
     const query = {
       query:
@@ -410,7 +510,7 @@ app.get("/tickets/my", authRequired, async (req, res) => {
 });
 
 // ✅ GET ONE
-app.get("/tickets/:id", async (req, res) => {
+app.get("/api/tickets/:id", async (req, res) => {
   try {
     const ticket = await findTicketByAnyId(req.params.id);
     if (!ticket) return res.status(404).json({ error: "Ticket not found" });
@@ -421,7 +521,7 @@ app.get("/tickets/:id", async (req, res) => {
 });
 
 // ✅ UPDATE STATUS
-app.put("/tickets/:id/status", async (req, res) => {
+app.put("/api/tickets/:id/status", async (req, res) => {
 
   try {
 
@@ -499,16 +599,46 @@ app.post("/support/troubleshoot", (req, res) => {
 // ==============================
 app.post("/dispatch/assign", async (req, res) => {
   try {
-    const { ticketId } = req.body;
+
+    const { ticketId, partName } = req.body;
 
     if (!ticketId) {
       return res.status(400).json({ error: "ticketId required" });
     }
 
     const ticket = await findTicketByAnyId(ticketId);
+
     if (!ticket) {
       return res.status(404).json({ error: "Ticket not found" });
     }
+
+    // find spare part
+    const query = {
+      query: "SELECT * FROM c WHERE LOWER(c.partName) = @partName",
+      parameters: [{ name: "@partName", value: partName.toLowerCase() }]
+    };
+
+    const { resources } = await sparePartsContainer.items
+      .query(query)
+      .fetchAll();
+
+    if (!resources.length) {
+      return res.status(404).json({ error: "Spare part not found" });
+    }
+
+    const part = resources[0];
+
+    if (part.stock <= 0) {
+      return res.status(400).json({ error: "Part out of stock" });
+    }
+
+    // reduce stock
+    await sparePartsContainer
+      .item(part.id, part.partId)
+      .replace({
+        ...part,
+        stock: part.stock - 1
+      });
 
     const pk = ticket.ticketId || ticket.id;
 
@@ -516,7 +646,7 @@ app.post("/dispatch/assign", async (req, res) => {
       ...ticket,
       status: "Assigned",
       technicianId: "TECH-001",
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     const { resource } = await ticketContainer
@@ -524,11 +654,66 @@ app.post("/dispatch/assign", async (req, res) => {
       .replace(updatedTicket);
 
     res.json(resource);
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// ==============================
+// STOCK SERVICE (Spare Parts)
+// ==============================
+
+app.post("/stock/check", async (req, res) => {
+
+  try {
+
+    const { partName } = req.body;
+
+    if (!partName) {
+      return res.status(400).json({
+        error: "partName required"
+      });
+    }
+
+    const query = {
+      query: "SELECT * FROM c WHERE LOWER(c.partName) = @partName",
+      parameters: [
+        {
+          name: "@partName",
+          value: partName.toLowerCase()
+        }
+      ]
+    };
+
+    const { resources } = await sparePartsContainer.items
+      .query(query)
+      .fetchAll();
+
+    if (resources.length === 0) {
+      return res.json({
+        available: false,
+        message: "Spare part not found"
+      });
+    }
+
+    const part = resources[0];
+
+    res.json({
+      partName: part.partName,
+      stock: part.stock,
+      available: part.stock > 0
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      error: err.message
+    });
+
+  }
+
+});
 // ==============================
 // WARRANTY SERVICE
 // ==============================
@@ -550,7 +735,7 @@ app.post("/check-warranty", async (req, res) => {
       ]
     };
 
-    const { resources } = await container.items
+const { resources } = await warrantyContainer.items
       .query(querySpec)
       .fetchAll();
 
@@ -573,8 +758,6 @@ app.post("/check-warranty", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-
-
 // ==============================
 // TECHNICIAN SERVICE
 // ==============================
@@ -611,6 +794,9 @@ app.get("/technician/available", (req, res) => {
   }
 });
 
+app.put("/technician/complete", async (req,res)=>{
+ const { ticketId } = req.body;
+})
 
 // ==============================
 // QUOTE SERVICE
@@ -640,6 +826,109 @@ app.post("/quote/generate", (req, res) => {
   }
 });
 
+// ==============================
+// CHAT HISTORY SERVICE
+// ==============================
+app.post("/chat", async (req, res) => {
+  try {
+
+    const { userId, message } = req.body;
+
+    // Save user message
+    await chatHistoryContainer.items.create({
+      id: Date.now().toString(),
+      userId,
+      message,
+      role: "user",
+      timestamp: new Date().toISOString()
+    });
+
+    // Get previous history
+    const query = {
+      query: "SELECT * FROM c WHERE c.userId=@userId ORDER BY c.timestamp",
+      parameters: [{ name: "@userId", value: userId }]
+    };
+
+    const { resources } = await chatHistoryContainer.items.query(query).fetchAll();
+
+    const messages = resources.map(m => ({
+      role: m.role,
+      content: m.message
+    }));
+
+    // Send to Foundry
+    const response = await axios.post(
+      FOUNDRY_ENDPOINT,
+      { messages },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": FOUNDRY_API_KEY
+        }
+      }
+    );
+
+    const aiMessage = response.data.choices[0].message.content;
+
+    // Save AI message
+    await chatHistoryContainer.items.create({
+      id: Date.now().toString(),
+      userId,
+      message: aiMessage,
+      role: "assistant",
+      timestamp: new Date().toISOString()
+    });
+
+    res.json({ reply: aiMessage });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "AI request failed" });
+  }
+});
+
+app.post("/chat/history", async (req, res) => {
+  try {
+
+    const { userId, message, role } = req.body;
+
+    const chat = {
+      id: Date.now().toString(),
+      userId,
+      message,
+      role,
+      timestamp: new Date().toISOString()
+    };
+
+    await chatHistoryContainer.items.create(chat);
+
+    res.json(chat);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to save chat" });
+  }
+});
+
+app.get("/chat/history/:userId", async (req, res) => {
+  try {
+
+    const { userId } = req.params;
+
+    const query = {
+      query: "SELECT * FROM c WHERE c.userId=@userId ORDER BY c.timestamp",
+      parameters: [{ name: "@userId", value: userId }]
+    };
+
+    const { resources } = await chatHistoryContainer.items.query(query).fetchAll();
+
+    res.json(resources);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch history" });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);

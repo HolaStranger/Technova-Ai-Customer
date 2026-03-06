@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { setAuth } from "../auth";
+import { getToken } from "../auth";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function CustomerLogin() {
+
   const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -13,77 +16,127 @@ export default function CustomerLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function onLogin(e) {
+  // 🔐 redirect if already logged in
+useEffect(() => {
+
+  const token = getToken();
+
+  if (token) {
+    navigate("/customer", { replace: true });
+  }
+
+}, []);
+
+  const onLogin = async (e) => {
+
     e.preventDefault();
     setError("");
 
     try {
+
       setLoading(true);
-      const res = await fetch(`${API}/auth/login`, {
+
+      const res = await fetch(`${API}/api/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+        }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Login failed");
 
+      if (!res.ok) {
+        throw new Error(data?.error || "Login failed");
+      }
+
+      // ✅ save token + user
       setAuth(data.token, data.user);
 
-      // ✅ go to customer portal (your existing page)
-      navigate("/customer");
+      // ✅ redirect to dashboard
+      navigate("/customer", { replace: true });
+
     } catch (err) {
-      setError(err.message);
+
+      setError(err.message || "Login error");
+
     } finally {
+
       setLoading(false);
+
     }
-  }
+
+  };
 
   return (
-    <div className="page">
-      <style>{css}</style>
+  <div className="page">
+    <style>{css}</style>
 
       <div className="topBar">
         <div className="topBarInner">
-          <button className="backBtn" onClick={() => navigate(-1)}>
+
+          <button
+            className="backBtn"
+            onClick={() => navigate("/")}
+          >
             ‹
           </button>
-          <div className="topTitle">Customer Login</div>
+
+          <div className="topTitle">
+            AI Customer Success Guardian
+          </div>
+
           <div style={{ width: 36 }} />
+
         </div>
       </div>
 
+
+      {/* Login Card */}
       <div className="wrap">
+
         <div className="card">
+
           <div className="head">
             <div className="logo">👤</div>
+
             <div>
               <div className="h1">Welcome</div>
-              <div className="sub">Login to track tickets & chat history</div>
+              <div className="sub">
+                Login to track tickets & chat history
+              </div>
             </div>
           </div>
 
           {error && <div className="err">{error}</div>}
 
           <form onSubmit={onLogin} className="form">
+
             <label className="label">Email</label>
+
             <input
               className="input"
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              type="email"
               required
             />
 
             <label className="label">Password</label>
+
             <div className="pwdWrap">
+
               <input
                 className="input"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                type={showPassword ? "text" : "password"}
                 required
               />
+
               <button
                 type="button"
                 className="eyeBtn"
@@ -91,28 +144,39 @@ export default function CustomerLogin() {
               >
                 {showPassword ? "👁️" : "🙈"}
               </button>
+
             </div>
 
-            <button className="btn" disabled={loading}>
+            <button
+              className="btn"
+              disabled={loading || !email || !password}
+            >
               {loading ? "Logging in..." : "Login"}
             </button>
+
           </form>
 
+
           <div className="foot">
+
             Don’t have an account?{" "}
+
             <button
               className="linkBtn"
               onClick={() => navigate("/customer-signup")}
             >
               Sign up
             </button>
+
           </div>
+
         </div>
+
       </div>
+
     </div>
   );
 }
-
 const css = `
   *{ box-sizing:border-box; }
   :root{
