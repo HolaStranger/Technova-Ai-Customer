@@ -601,12 +601,14 @@ app.post("/dispatch/assign", async (req, res) => {
   try {
     const { ticketId, skill } = req.body;
 
+    // Validate input
     if (!ticketId || !skill) {
       return res.status(400).json({
         error: "ticketId and skill are required"
       });
     }
 
+    // Query technician database
     const querySpec = {
       query: "SELECT * FROM c WHERE c.skill = @skill",
       parameters: [
@@ -621,30 +623,35 @@ app.post("/dispatch/assign", async (req, res) => {
       .query(querySpec)
       .fetchAll();
 
-    if (resources.length === 0) {
+    // If no technician available
+    if (!resources || resources.length === 0) {
       return res.json({
         ticketId,
-        status: "no_technician_available"
+        skill,
+        status: "no_technician_available",
+        message: "No technician found with required skill"
       });
     }
 
+    // Assign first technician
     const technician = resources[0];
 
     res.json({
       ticketId,
       technicianName: technician.name,
       technicianPhone: technician.phone,
+      skill: technician.skill,
       status: "assigned"
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Dispatch Error:", error);
+
     res.status(500).json({
-      error: "Dispatch service error"
+      error: "Dispatch service failed"
     });
   }
 });
-
 // ==============================
 // STOCK SERVICE (Spare Parts)
 // ==============================
