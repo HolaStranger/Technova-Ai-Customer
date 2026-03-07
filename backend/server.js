@@ -427,40 +427,98 @@ app.get("/api/auth/me", authRequired, async (req, res) => {
 // ✅ CREATE TICKET
 app.post("/api/tickets", async (req, res) => {
   try {
-    const newId = Date.now().toString();
 
-    const emotion = detectEmotion(req.body.issue);
+    const {
+      customerName,
+      customerEmail,
+      issue
+    } = req.body;
+
+    // -----------------------------
+    // 1️⃣ Validate Input
+    // -----------------------------
+    if (!customerEmail || !issue) {
+      return res.status(400).json({
+        error: "customerEmail and issue are required"
+      });
+    }
+
+    const email = String(customerEmail).trim().toLowerCase();
+    const description = String(issue).trim();
+
+    if (!email.includes("@")) {
+      return res.status(400).json({
+        error: "Invalid email format"
+      });
+    }
+
+    if (description.length < 3) {
+      return res.status(400).json({
+        error: "Issue description too short"
+      });
+    }
+
+    // -----------------------------
+    // 2️⃣ Detect Emotion
+    // -----------------------------
+    const emotion = detectEmotion(description);
 
     let priority = "Normal";
+
     if (emotion === "angry") {
       priority = "High";
     }
 
+    // -----------------------------
+    // 3️⃣ Create Ticket Object
+    // -----------------------------
+    const ticketId = Date.now().toString();
+
     const ticket = {
-      id: newId,
-      ticketId: newId,
-      customerName: req.body.customerName || "",
-      customerEmail: String(req.body.customerEmail || "").toLowerCase(),
-      issue: req.body.issue || "",
-      emotion: emotion,
-      priority: priority,
+      id: ticketId,
+      ticketId: ticketId,
+      customerName: customerName ? String(customerName).trim() : "Unknown Customer",
+      customerEmail: email,
+      issue: description,
+      emotion,
+      priority,
       status: "Open",
       createdAt: new Date().toISOString()
     };
 
-    // 1️⃣ Save ticket to Cosmos DB
-  await ticketContainer.items.create(ticket);
+    // -----------------------------
+    // 4️⃣ Save Ticket to Cosmos DB
+    // -----------------------------
+    const { resource } = await ticketContainer.items.create(ticket);
 
-    // 2️⃣ If customer is angry → send email to manager
+    // -----------------------------
+    // 5️⃣ Angry Customer Escalation
+    // -----------------------------
     if (emotion === "angry") {
-      await sendManagerEmail(ticket);
+      try {
+        await sendManagerEmail(ticket);
+      } catch (emailError) {
+        console.warn("Manager email failed:", emailError.message);
+      }
     }
 
-    // 3️⃣ Return response
-    res.json(ticket);
+    // -----------------------------
+    // 6️⃣ Return Response
+    // -----------------------------
+    res.status(201).json({
+      status: "success",
+      message: "Ticket created successfully",
+      ticket: resource
+    });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+
+    console.error("Ticket creation error:", error);
+
+    res.status(500).json({
+      error: "Ticket creation failed"
+    });
+
   }
 });
 
@@ -638,9 +696,9 @@ app.post("/dispatch/assign", async (req, res) => {
 
     res.json({
       ticketId,
-      technicianName: technician.name,
-      technicianPhone: technician.phone,
-      skill: technician.skill,
+      technicianName: technician.name || "Unknown Technician",
+      technicianPhone: technician.phone || "N/A",
+      skill: technician.skill || skill,
       status: "assigned"
     });
 
@@ -790,9 +848,40 @@ app.get("/technician/available", (req, res) => {
   }
 });
 
-app.put("/technician/complete", async (req,res)=>{
- const { ticketId } = req.body;
-})
+app.put("/technician/complete", async (req, res) => {
+  try {
+    const { ticketId } = req.body;
+
+    if (!ticketId) {
+      return res.status(400).json({
+        error: "ticketId required"
+      });
+    }
+
+    const ticket = await findTicketByAnyId(ticketId);
+
+    if (!ticket) {
+      return res.status(404).json({
+        error: "Ticket not found"
+      });
+    }
+
+    ticket.status = "Completed";
+    ticket.completedAt = new Date().toISOString();
+
+    await ticketContainer.item(ticket.id, ticket.ticketId).replace(ticket);
+
+    res.json({
+      message: "Technician job completed",
+      ticket
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      error: err.message
+    });
+  }
+});
 
 // ==============================
 // QUOTE SERVICE
