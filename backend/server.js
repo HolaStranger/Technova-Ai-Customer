@@ -735,12 +735,15 @@ app.post("/check-warranty", async (req, res) => {
       ]
     };
 
-const { resources } = await warrantyContainer.items
+    const { resources } = await warrantyContainer.items
       .query(querySpec)
       .fetchAll();
 
     if (resources.length === 0) {
-      return res.status(404).json({
+      return res.json({
+        serialNumber: serialNumber,
+        inWarranty: false,
+        status: "not_found",
         message: "Warranty record not found"
       });
     }
@@ -750,7 +753,8 @@ const { resources } = await warrantyContainer.items
     res.json({
       serialNumber: warranty.serialNumber,
       inWarranty: warranty.warrantyValid,
-      expiryDate: warranty.warrantyExpiryDate
+      expiryDate: warranty.warrantyExpiryDate,
+      status: "found"
     });
 
   } catch (error) {
