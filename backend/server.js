@@ -584,7 +584,7 @@ app.put("/api/tickets/:id/status", async (req, res) => {
   }
 
 });
-//  Viki updated
+
 // ==============================
 // SUPPORT SERVICE (Self-Fix Bot)
 // ==============================
