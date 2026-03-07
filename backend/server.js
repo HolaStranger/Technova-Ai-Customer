@@ -599,64 +599,49 @@ app.post("/support/troubleshoot", (req, res) => {
 // ==============================
 app.post("/dispatch/assign", async (req, res) => {
   try {
+    const { ticketId, skill } = req.body;
 
-    const { ticketId, partName } = req.body;
-
-    if (!ticketId) {
-      return res.status(400).json({ error: "ticketId required" });
+    if (!ticketId || !skill) {
+      return res.status(400).json({
+        error: "ticketId and skill are required"
+      });
     }
 
-    const ticket = await findTicketByAnyId(ticketId);
-
-    if (!ticket) {
-      return res.status(404).json({ error: "Ticket not found" });
-    }
-
-    // find spare part
-    const query = {
-      query: "SELECT * FROM c WHERE LOWER(c.partName) = @partName",
-      parameters: [{ name: "@partName", value: partName.toLowerCase() }]
+    const querySpec = {
+      query: "SELECT * FROM c WHERE c.skill = @skill",
+      parameters: [
+        {
+          name: "@skill",
+          value: skill
+        }
+      ]
     };
 
-    const { resources } = await sparePartsContainer.items
-      .query(query)
+    const { resources } = await technicianContainer.items
+      .query(querySpec)
       .fetchAll();
 
-    if (!resources.length) {
-      return res.status(404).json({ error: "Spare part not found" });
-    }
-
-    const part = resources[0];
-
-    if (part.stock <= 0) {
-      return res.status(400).json({ error: "Part out of stock" });
-    }
-
-    // reduce stock
-    await sparePartsContainer
-      .item(part.id, part.partId)
-      .replace({
-        ...part,
-        stock: part.stock - 1
+    if (resources.length === 0) {
+      return res.json({
+        ticketId,
+        status: "no_technician_available"
       });
+    }
 
-    const pk = ticket.ticketId || ticket.id;
+    const technician = resources[0];
 
-    const updatedTicket = {
-      ...ticket,
-      status: "Assigned",
-      technicianId: "TECH-001",
-      updatedAt: new Date().toISOString()
-    };
+    res.json({
+      ticketId,
+      technicianName: technician.name,
+      technicianPhone: technician.phone,
+      status: "assigned"
+    });
 
-    const { resource } = await ticketContainer
-      .item(ticket.id, pk)
-      .replace(updatedTicket);
-
-    res.json(resource);
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: "Dispatch service error"
+    });
   }
 });
 
