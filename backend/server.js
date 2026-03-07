@@ -219,9 +219,11 @@ if (!name || !email || !password) {
   });
 }
 
-if (!email.includes("@")) {
+const contact = String(customerEmail).trim();
+
+if (contact.length < 5) {
   return res.status(400).json({
-    error: "Invalid email format"
+    error: "Customer contact is required"
   });
 }
 
@@ -428,57 +430,31 @@ app.get("/api/auth/me", authRequired, async (req, res) => {
 app.post("/api/tickets", async (req, res) => {
   try {
 
-    const {
-      customerName,
-      customerEmail,
-      issue
-    } = req.body;
+    const { customerName, customerEmail, issue } = req.body;
 
-    // -----------------------------
-    // 1️⃣ Validate Input
-    // -----------------------------
     if (!customerEmail || !issue) {
       return res.status(400).json({
-        error: "customerEmail and issue are required"
+        error: "customerEmail/contact and issue are required"
       });
     }
 
-    const email = String(customerEmail).trim().toLowerCase();
+    const contact = String(customerEmail).trim();
     const description = String(issue).trim();
 
-    if (!email.includes("@")) {
-      return res.status(400).json({
-        error: "Invalid email format"
-      });
-    }
-
-    if (description.length < 3) {
-      return res.status(400).json({
-        error: "Issue description too short"
-      });
-    }
-
-    // -----------------------------
-    // 2️⃣ Detect Emotion
-    // -----------------------------
     const emotion = detectEmotion(description);
 
     let priority = "Normal";
-
     if (emotion === "angry") {
       priority = "High";
     }
 
-    // -----------------------------
-    // 3️⃣ Create Ticket Object
-    // -----------------------------
     const ticketId = Date.now().toString();
 
     const ticket = {
       id: ticketId,
-      ticketId: ticketId,
-      customerName: customerName ? String(customerName).trim() : "Unknown Customer",
-      customerEmail: email,
+      ticketId,
+      customerName: customerName || "Customer",
+      customerContact: contact,
       issue: description,
       emotion,
       priority,
@@ -486,28 +462,18 @@ app.post("/api/tickets", async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
-    // -----------------------------
-    // 4️⃣ Save Ticket to Cosmos DB
-    // -----------------------------
     const { resource } = await ticketContainer.items.create(ticket);
 
-    // -----------------------------
-    // 5️⃣ Angry Customer Escalation
-    // -----------------------------
     if (emotion === "angry") {
       try {
         await sendManagerEmail(ticket);
-      } catch (emailError) {
-        console.warn("Manager email failed:", emailError.message);
+      } catch (e) {
+        console.warn("Email failed:", e.message);
       }
     }
 
-    // -----------------------------
-    // 6️⃣ Return Response
-    // -----------------------------
-    res.status(201).json({
+    res.json({
       status: "success",
-      message: "Ticket created successfully",
       ticket: resource
     });
 
