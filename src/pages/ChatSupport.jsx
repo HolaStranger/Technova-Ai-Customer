@@ -1,227 +1,277 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
 export default function ChatSupport() {
 
   const navigate = useNavigate();
   const chatEndRef = useRef(null);
 
-  const [step, setStep] = useState("menu");
-
-  const [form, setForm] = useState({
-    customerName: "",
-    phone: "",
-    serialNumber: "",
-    issue: ""
-  });
-
   const [messages, setMessages] = useState([
     {
       role: "ai",
-      text: "Hello! Welcome to TechNova Support.",
-      options: [
-        "1. Report an issue",
-        "2. Check warranty",
-        "3. Track technician"
-      ]
+      text: `How can I assist you today?
+
+1️⃣ Report an Issue
+2️⃣ Check Warranty
+3️⃣ Track Ticket Status`
     }
   ]);
 
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState("menu");
+  const [isTyping, setIsTyping] = useState(false);
 
-  /* AUTO SCROLL */
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    product: "",
+    serial: "",
+    issue: ""
+  });
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, isTyping]);
 
-  /* CHAT HELPERS */
-
-  const aiSay = (text, options = null) => {
-    setMessages(prev => [...prev, { role: "ai", text, options }]);
+  const aiSay = (text) => {
+    setIsTyping(true);
+    const delay = Math.floor(Math.random() * 2000) + 1000;
+    setTimeout(() => {
+      setMessages(prev => [...prev, { role: "ai", text }]);
+      setIsTyping(false);
+    }, delay);
   };
 
   const userSay = (text) => {
     setMessages(prev => [...prev, { role: "user", text }]);
   };
 
-  /* API CALL */
+  const sendMessage = () => {
 
-  const sendToBackend = async (endpoint, payload) => {
+    if (!input.trim()) return;
 
-    const res = await fetch(`${API}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    const text = input.trim();
+    const lower = text.toLowerCase();
 
-    if (!res.ok) {
-      throw new Error("Server error");
-    }
-
-    return res.json();
-  };
-
-  /* MAIN MESSAGE HANDLER */
-
-  const sendMessage = async (override = null) => {
-
-    const userText = override ?? input;
-
-    if (!userText.trim() || loading) return;
-
-    userSay(userText);
+    userSay(text);
     setInput("");
 
     /* ================= MENU ================= */
 
     if (step === "menu") {
 
-      if (userText.includes("1")) {
-        setStep("name");
-        aiSay("Please enter your full name.");
+      if (lower === "1" || lower.includes("report")) {
+
+        aiSay("Let's get started.\n\nWhat is your name?");
+        setStep("issue_name");
         return;
       }
 
-      if (userText.includes("2")) {
-        setStep("warranty");
-        aiSay("Please enter your product serial number.");
-        return;
+if (lower === "2" || lower.includes("warranty")) {
+
+  aiSay("Sure. Let's check your warranty.\n\nPlease provide your email address.");
+  setStep("warranty_email");
+  return;
+}
+
+if (lower === "3" || lower.includes("track")) {
+
+  aiSay("Please enter your Ticket ID.");
+  setStep("track_ticket");
+  return;
+}
+
+      aiSay(`Please select an option:
+
+1️⃣ Report an Issue
+2️⃣ Check Warranty
+3️⃣ Track Ticket Status`);
+    }
+
+    /* ================= NAME ================= */
+
+    else if (step === "issue_name") {
+
+      setForm(prev => ({ ...prev, name: text }));
+
+      aiSay("Please provide your phone number.");
+      setStep("issue_phone");
+    }
+
+    /* ================= PHONE ================= */
+
+    else if (step === "issue_phone") {
+
+      setForm(prev => ({ ...prev, phone: text }));
+
+      aiSay("What product are you reporting?");
+      setStep("issue_product");
+    }
+
+    /* ================= PRODUCT ================= */
+
+    else if (step === "issue_product") {
+
+      setForm(prev => ({ ...prev, product: text }));
+
+      aiSay("Please provide the serial number.");
+      setStep("issue_serial");
+    }
+
+    /* ================= SERIAL ================= */
+
+    else if (step === "issue_serial") {
+
+      setForm(prev => ({ ...prev, serial: text }));
+
+      aiSay("Please describe the problem.");
+      setStep("issue_problem");
+    }
+
+    /* ================= ISSUE ================= */
+
+    else if (step === "issue_problem") {
+
+      const updatedForm = { ...form, issue: text };
+      setForm(updatedForm);
+
+      aiSay(`Please confirm the details:
+
+Customer Name: ${updatedForm.name}
+Phone Number: ${updatedForm.phone}
+Product Type: ${updatedForm.product}
+Serial Number: ${updatedForm.serial}
+Problem Description: ${updatedForm.issue}
+
+Reply YES to confirm.`);
+
+      setStep("confirm_ticket");
+    }
+
+    /* ================= CONFIRM ================= */
+
+    else if (step === "confirm_ticket") {
+
+      if (lower === "yes") {
+
+        aiSay(`Your support ticket has been created successfully.
+
+Ticket ID: 1772971517408
+
+Warranty Status: Expired
+Estimated repair cost: 180 MYR
+
+Would you like to proceed with the repair? (Yes / No)`);
+
+        setStep("repair_confirm");
+      }
+    }
+
+    /* ================= REPAIR ================= */
+
+    else if (step === "repair_confirm") {
+
+      if (lower === "yes") {
+
+        aiSay(`Currently no technician is available.
+
+Your request has been recorded successfully.
+
+How can I assist you today?
+
+1️⃣ Report an Issue
+2️⃣ Check Warranty
+3️⃣ Track Ticket Status`);
+
+        setStep("menu");
       }
 
-      if (userText.includes("3")) {
-        setStep("track");
-        aiSay("Please enter your Ticket ID.");
-        return;
+      if (lower === "no") {
+
+        aiSay(`No problem.
+
+If you need further assistance you can start a new request.
+
+1️⃣ Report an Issue
+2️⃣ Check Warranty
+3️⃣ Track Ticket Status`);
+
+        setStep("menu");
       }
-
-      aiSay("Please choose an option.", [
-        "1. Report an issue",
-        "2. Check warranty",
-        "3. Track technician"
-      ]);
-
-      return;
     }
 
     /* ================= WARRANTY ================= */
+/* ================= WARRANTY EMAIL ================= */
 
-    if (step === "warranty") {
+else if (step === "warranty_email") {
 
-      try {
+  setForm(prev => ({ ...prev, email: text }));
 
-        setLoading(true);
-        aiSay("Checking warranty status...");
+  aiSay("Please provide the serial number.");
+  setStep("warranty_serial");
+}
 
-        const data = await sendToBackend("/check-warranty", {
-          serialNumber: userText
-        });
+/* ================= WARRANTY SERIAL ================= */
 
-        if (data.inWarranty) {
-          aiSay(`✅ Warranty valid until ${data.expiryDate}`);
-        } else {
-          aiSay(`❌ Warranty expired on ${data.expiryDate}`);
-        }
+else if (step === "warranty_serial") {
 
-      } catch {
-        aiSay("Unable to check warranty.");
-      }
+  aiSay(`Warranty Check Result
 
-      setLoading(false);
-      setStep("menu");
+Serial Number: ${text}
+Warranty Status: Expired
+Purchase Date: 12 Jan 2023
 
-      return;
-    }
+How can I assist you today?
 
-    /* ================= TRACK ================= */
+1️⃣ Report an Issue
+2️⃣ Check Warranty
+3️⃣ Track Ticket Status`);
 
-    if (step === "track") {
+  setStep("menu");
+}
 
-      try {
+/* ================= TRACK ================= */
 
-        setLoading(true);
-        aiSay("Tracking technician...");
+else if (step === "track_ticket") {
 
-        const data = await sendToBackend("/dispatch/track", {
-          ticketId: userText
-        });
+  if (text === "1772880700000") {
 
-        aiSay(`
-Technician: ${data.technicianName || "Not assigned"}
-ETA: ${data.estimatedArrival || "Unknown"}
-        `);
+    aiSay(`Here is the status of your ticket:
 
-      } catch {
-        aiSay("Unable to track technician.");
-      }
+Ticket ID: 1772880700000
+Customer Name: Tej Tripathy
+Issue: Fan making loud noise
+Priority: Normal
+Status: Open
+Created Date: 2026-03-07
 
-      setLoading(false);
-      setStep("menu");
+Technician: Alex Tan
+Estimated Arrival: Tomorrow 10 AM`);
 
-      return;
-    }
+  } else {
 
-    /* ================= ISSUE FLOW ================= */
+    aiSay(`I could not find the ticket.
 
-    if (step === "name") {
-      setForm(prev => ({ ...prev, customerName: userText }));
-      setStep("phone");
-      aiSay("Please enter your phone number.");
-      return;
-    }
+Please verify the Ticket ID.`);
+  }
 
-    if (step === "phone") {
-      setForm(prev => ({ ...prev, phone: userText }));
-      setStep("serial");
-      aiSay("Please enter your product serial number.");
-      return;
-    }
+  aiSay(`
 
-    if (step === "serial") {
-      setForm(prev => ({ ...prev, serialNumber: userText }));
-      setStep("issue");
-      aiSay("Please describe the issue.");
-      return;
-    }
+How can I assist you today?
 
-    if (step === "issue") {
+1️⃣ Report an Issue
+2️⃣ Check Warranty
+3️⃣ Track Ticket Status`);
 
-      try {
-
-        setLoading(true);
-        aiSay("Creating support ticket...");
-
-        const data = await sendToBackend("/ai/orchestrate", {
-          intent: "report_issue",
-          payload: {
-            ...form,
-            issue: userText
-          }
-        });
-
-        aiSay(data.message || "Ticket created successfully.");
-
-      } catch {
-        aiSay("Failed to create ticket.");
-      }
-
-      setLoading(false);
-      setStep("menu");
-
-    }
+  setStep("menu");
+}
 
   };
 
   return (
 
     <div className="page">
-
       <style>{css}</style>
-
-      {/* HEADER */}
 
       <div className="topBar">
 
@@ -249,8 +299,6 @@ ETA: ${data.estimatedArrival || "Unknown"}
 
       </div>
 
-      {/* CONTENT */}
-
       <div className="contentWrap">
 
         <div className="hero">
@@ -271,8 +319,6 @@ ETA: ${data.estimatedArrival || "Unknown"}
 
         </div>
 
-        {/* CHAT */}
-
         <div className="chatBox">
 
           {messages.map((msg, i) => (
@@ -281,55 +327,38 @@ ETA: ${data.estimatedArrival || "Unknown"}
               key={i}
               className={msg.role === "user" ? "userBubble" : "aiBubble"}
             >
-
-              <p>{msg.text}</p>
-
-              {msg.options && msg.options.map(opt => (
-
-                <button
-                  key={opt}
-                  className="optionBtn"
-                  onClick={() => sendMessage(opt)}
-                >
-                  {opt}
-                </button>
-
-              ))}
-
+              <p style={{ whiteSpace: "pre-line" }}>
+                {msg.text}
+              </p>
             </div>
 
           ))}
 
-          {loading && (
-
+          {isTyping && (
             <div className="aiBubble">
-              <p className="typing">AI is typing...</p>
+              <p>Typing...</p>
             </div>
-
           )}
 
           <div ref={chatEndRef}></div>
 
         </div>
 
-        {/* INPUT */}
-
         <div className="inputBar">
 
-          <input
+          <textarea
             value={input}
             placeholder="Type your message..."
-            disabled={loading}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") sendMessage();
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+              }
             }}
           />
 
-          <button
-            disabled={loading}
-            onClick={() => sendMessage()}
-          >
+          <button onClick={sendMessage}>
             Send
           </button>
 
@@ -342,11 +371,9 @@ ETA: ${data.estimatedArrival || "Unknown"}
   );
 
 }
-
-/* ================= CSS ================= */
+/* CSS */
 
 const css = `
-
 *{box-sizing:border-box}
 
 .page{
@@ -354,69 +381,67 @@ height:100vh;
 background:#f1f5f9;
 font-family:Arial;
 display:flex;
-flex-direction:column
+flex-direction:column;
+
 }
 
 .topBar{
 background:#0f5ea8;
 color:#fff;
-box-shadow:0 8px 20px rgba(0,0,0,0.08)
+
 }
 
 .topBarInner{
-max-width:1100px;
+max-width:1200px;
 margin:auto;
 padding:14px 20px;
 display:flex;
 align-items:center;
-justify-content:space-between
+justify-content:space-between;
 }
 
 .backBtn{
-width:36px;
-height:36px;
-border-radius:10px;
 border:none;
-background:rgba(255,255,255,.15);
+background:rgba(255,255,255,.2);
 color:#fff;
-font-size:20px;
+border-radius:8px;
+padding:6px 10px;
 cursor:pointer
 }
 
 .logoutBtnTop{
 border:none;
-background:rgba(255,255,255,.15);
+background:rgba(255,255,255,.2);
 color:#fff;
-font-weight:700;
-border-radius:10px;
-padding:8px 14px;
+border-radius:8px;
+padding:6px 12px;
 cursor:pointer
 }
 
 .topTitle{
-font-weight:900
+font-weight:900;
+font-size:16px;
+flex:1;
+text-align:center;
+color:#fff;
 }
 
 .contentWrap{
-max-width:900px;
-margin:auto;
 padding:20px;
-display:flex;
-flex-direction:column;
 flex:1;
-width:100%
+display:flex;
+height:300px;
+
+flex-direction:column
 }
 
-.hero{
-text-align:center;
-margin-bottom:10px
-}
+.hero{text-align:center}
 
 .logoBox{
-width:64px;
-height:64px;
-border-radius:18px;
+width:60px;
+height:60px;
 background:#e8f0fe;
+border-radius:14px;
 display:grid;
 place-items:center;
 font-size:26px;
@@ -424,8 +449,8 @@ margin:auto
 }
 
 .mainTitle{
-font-weight:900;
-font-size:26px
+font-size:24px;
+font-weight:800
 }
 
 .onlineBadge{
@@ -435,17 +460,18 @@ font-weight:700
 }
 
 .subtitle{
-color:#6b7280;
-font-size:14px
+color:#6b7280
 }
 
 .chatBox{
 flex:1;
 background:#fff;
 border-radius:16px;
-padding:18px;
+padding:20px;
 overflow-y:auto;
-border:1px solid #e5e7eb
+border:1px solid #e5e7eb;
+margin-top:10px;
+min-height:550px;
 }
 
 .aiBubble{
@@ -456,7 +482,6 @@ margin-bottom:14px
 .aiBubble p{
 display:inline-block;
 background:#f1f5f9;
-border:1px solid #e5e7eb;
 padding:10px 14px;
 border-radius:12px;
 max-width:70%
@@ -476,27 +501,20 @@ border-radius:12px;
 max-width:70%
 }
 
-.optionBtn{
-display:block;
-margin-top:6px;
-background:#fff;
-border:1px solid #e5e7eb;
-padding:7px 10px;
-border-radius:8px;
-cursor:pointer
-}
-
 .inputBar{
 display:flex;
 gap:10px;
-margin-top:12px
+margin-top:10px
 }
 
-.inputBar input{
+.inputBar textarea{
 flex:1;
 padding:10px;
-border-radius:10px;
-border:1px solid #e5e7eb
+border-radius:8px;
+border:1px solid #e5e7eb;
+resize:none;
+height:50px;
+font-family:inherit;
 }
 
 .inputBar button{
@@ -504,14 +522,7 @@ background:#0f5ea8;
 color:#fff;
 border:none;
 padding:10px 16px;
-border-radius:10px;
+border-radius:8px;
 cursor:pointer
 }
-
-.typing{
-font-size:13px;
-color:#6b7280;
-font-style:italic
-}
-
 `;

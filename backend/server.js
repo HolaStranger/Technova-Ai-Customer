@@ -6,6 +6,8 @@ import { CosmosClient } from "@azure/cosmos";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import axios from "axios";
+import { v4 as uuidv4 } from "uuid";
+import fetch from "node-fetch";
 
 dotenv.config();
 
@@ -35,7 +37,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
 
 const FOUNDRY_ENDPOINT = process.env.FOUNDRY_ENDPOINT;
 const FOUNDRY_API_KEY = process.env.FOUNDRY_API_KEY;
-
+const conversations = {};
 // ---------------- helpers ----------------
 function createToken(payload) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
@@ -424,7 +426,6 @@ app.get("/api/auth/me", authRequired, async (req, res) => {
   });
 
 });
-
 
 // ✅ CREATE TICKET
 app.post("/api/tickets", async (req, res) => {
@@ -979,6 +980,58 @@ app.get("/chat/history/:userId", async (req, res) => {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch history" });
   }
+});
+
+/* ================= AI ORCHESTRATOR ================= */
+
+app.post("/ai/orchestrate", async (req, res) => {
+
+  try {
+
+    const { message } = req.body;
+
+    const endpoint = process.env.FOUNDRY_ENDPOINT;
+    const apiKey = process.env.FOUNDRY_API_KEY;
+
+    const response = await fetch(
+      `${endpoint}/openai/responses?api-version=2025-01-01-preview`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-key": apiKey
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          input: message || "Start conversation",
+          temperature: 0.2
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    console.log("FOUNDRY RESPONSE:", data);
+
+    let aiMessage =
+      data.output_text ||
+      data.output?.[0]?.content?.[0]?.text ||
+      "AI response unavailable.";
+
+    res.json({
+      message: aiMessage
+    });
+
+  } catch (err) {
+
+    console.error("Agent Error:", err);
+
+    res.status(500).json({
+      message: "Agent call failed"
+    });
+
+  }
+
 });
 
 app.listen(PORT, () => {
