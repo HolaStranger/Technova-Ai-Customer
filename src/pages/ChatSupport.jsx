@@ -42,6 +42,20 @@ export default function ChatSupport() {
     }, delay);
   };
 
+  const saveDemoTicket = (ticketData) => {
+    const existing = JSON.parse(localStorage.getItem("TECH_DEMO_TICKETS") || "[]");
+    const newTicket = {
+      id: "DEMO-" + Math.floor(Math.random() * 9000000 + 1000000),
+      ...ticketData,
+      status: "open",
+      createdAt: new Date().toISOString(),
+      customerName: ticketData.name || "Demo Customer",
+      technicianId: localStorage.getItem("technician_id") || "tech-123"
+    };
+    existing.unshift(newTicket);
+    localStorage.setItem("TECH_DEMO_TICKETS", JSON.stringify(existing));
+  };
+
   const userSay = (text) => {
     setMessages(prev => [...prev, { role: "user", text }]);
   };
@@ -67,19 +81,19 @@ export default function ChatSupport() {
         return;
       }
 
-if (lower === "2" || lower.includes("warranty")) {
+      if (lower === "2" || lower.includes("warranty")) {
 
-  aiSay("Sure. Let's check your warranty.\n\nPlease provide your email address.");
-  setStep("warranty_email");
-  return;
-}
+        aiSay("Sure. Let's check your warranty.\n\nPlease provide your email address.");
+        setStep("warranty_email");
+        return;
+      }
 
-if (lower === "3" || lower.includes("track")) {
+      if (lower === "3" || lower.includes("track")) {
 
-  aiSay("Please enter your Ticket ID.");
-  setStep("track_ticket");
-  return;
-}
+        aiSay("Please enter your Ticket ID.");
+        setStep("track_ticket");
+        return;
+      }
 
       aiSay(`Please select an option:
 
@@ -153,7 +167,7 @@ Reply YES to confirm.`);
     else if (step === "confirm_ticket") {
 
       if (lower === "yes") {
-
+        saveDemoTicket(form);
         aiSay(`Your support ticket has been created successfully.
 
 Ticket ID: 1772971517408
@@ -173,11 +187,9 @@ Would you like to proceed with the repair? (Yes / No)`);
 
       if (lower === "yes") {
 
-        aiSay(`Currently no technician is available.
+        aiSay(`I apologize, but all our technicians are currently assisting other customers. Your repair request has been logged successfully, and we will prioritize your ticket as soon as someone becomes available.
 
-Your request has been recorded successfully.
-
-How can I assist you today?
+How can I assist you in the meantime?
 
 1️⃣ Report an Issue
 2️⃣ Check Warranty
@@ -201,25 +213,20 @@ If you need further assistance you can start a new request.
     }
 
     /* ================= WARRANTY ================= */
-/* ================= WARRANTY EMAIL ================= */
+    /* ================= WARRANTY EMAIL ================= */
 
-else if (step === "warranty_email") {
+    else if (step === "warranty_email") {
 
-  setForm(prev => ({ ...prev, email: text }));
+      setForm(prev => ({ ...prev, email: text }));
 
-  aiSay("Please provide the serial number.");
-  setStep("warranty_serial");
-}
+      aiSay("Please provide the serial number.");
+      setStep("warranty_serial");
+    }
 
-/* ================= WARRANTY SERIAL ================= */
+    /* ================= WARRANTY SERIAL ================= */
 
-else if (step === "warranty_serial") {
-
-  aiSay(`Warranty Check Result
-
-Serial Number: ${text}
-Warranty Status: Expired
-Purchase Date: 12 Jan 2023
+    else if (step === "warranty_serial") {
+      aiSay(`Based on our records for serial ${text}, the warranty status is EXPIRED (Purchase Date: 12 Jan 2023).
 
 How can I assist you today?
 
@@ -227,35 +234,34 @@ How can I assist you today?
 2️⃣ Check Warranty
 3️⃣ Track Ticket Status`);
 
-  setStep("menu");
-}
+      setStep("menu");
+    }
 
-/* ================= TRACK ================= */
+    /* ================= TRACK ================= */
 
-else if (step === "track_ticket") {
+    else if (step === "track_ticket") {
 
-  if (text === "1772880700000") {
+      if (text === "1772880700000") {
 
-    aiSay(`Here is the status of your ticket:
+        aiSay(`Here is the status of your ticket:
 
 Ticket ID: 1772880700000
-Customer Name: Tej Tripathy
+Customer Name: Amirul
 Issue: Fan making loud noise
 Priority: Normal
 Status: Open
 Created Date: 2026-03-07
-
 Technician: Alex Tan
 Estimated Arrival: Tomorrow 10 AM`);
 
-  } else {
+      } else {
 
-    aiSay(`I could not find the ticket.
+        aiSay(`I could not find the ticket.
 
 Please verify the Ticket ID.`);
-  }
+      }
 
-  aiSay(`
+      aiSay(`
 
 How can I assist you today?
 
@@ -263,8 +269,8 @@ How can I assist you today?
 2️⃣ Check Warranty
 3️⃣ Track Ticket Status`);
 
-  setStep("menu");
-}
+      setStep("menu");
+    }
 
   };
 

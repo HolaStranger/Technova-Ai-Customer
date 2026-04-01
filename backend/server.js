@@ -8,6 +8,8 @@ import jwt from "jsonwebtoken";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import fetch from "node-fetch";
+import fs from "fs";
+import path from "path";
 
 dotenv.config();
 
@@ -38,6 +40,33 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
 const FOUNDRY_ENDPOINT = process.env.FOUNDRY_ENDPOINT;
 const FOUNDRY_API_KEY = process.env.FOUNDRY_API_KEY;
 const conversations = {};
+
+// ---------------- LOCAL FILE ----------------
+const BACKUP_PATH = "./db_backup_tickets.json";
+
+function saveTicketLocal(ticket) {
+  try {
+    let list = [];
+    if (fs.existsSync(BACKUP_PATH)) {
+      list = JSON.parse(fs.readFileSync(BACKUP_PATH, "utf-8") || "[]");
+    }
+    list.unshift(ticket);
+    fs.writeFileSync(BACKUP_PATH, JSON.stringify(list, null, 2));
+  } catch (err) {
+    console.warn("Local backup failed:", err.message);
+  }
+}
+
+function getTicketsLocal() {
+  try {
+    if (fs.existsSync(BACKUP_PATH)) {
+      return JSON.parse(fs.readFileSync(BACKUP_PATH, "utf-8") || "[]");
+    }
+  } catch (err) {
+    console.warn("Local read failed:", err.message);
+  }
+  return [];
+}
 // ---------------- helpers ----------------
 function createToken(payload) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
@@ -465,6 +494,9 @@ app.post("/api/tickets", async (req, res) => {
 
     const { resource } = await ticketContainer.items.create(ticket);
 
+    // PERSISTENCE BACKUP: Save to local JSON file for presentation safety
+    saveTicketLocal(ticket);
+
     if (emotion === "angry") {
       try {
         await sendManagerEmail(ticket);
@@ -497,11 +529,29 @@ app.get("/api/tickets", async (req, res) => {
       query: "SELECT * FROM c ORDER BY c.createdAt DESC"
     };
 
-    const { resources } = await ticketContainer.items
+    const { resources: cosmosTickets } = await ticketContainer.items
       .query(query)
       .fetchAll();
 
-    res.json(resources);
+    const localTickets = getTicketsLocal();
+    
+    // Merge and remove duplicates by ticketId
+    const merged = [...localTickets, ...cosmosTickets];
+    const unique = [];
+    const ids = new Set();
+    
+    for (const t of merged) {
+      const tid = t.ticketId || t.id;
+      if (!ids.has(tid)) {
+        ids.add(tid);
+        unique.push(t);
+      }
+    }
+
+    // Ensure sorted by newest
+    unique.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json(unique);
 
   } catch (err) {
 

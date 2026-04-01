@@ -156,7 +156,7 @@ export default function TicketDetails() {
               <div className="desc">
                 <div className="descLabel">Issue Details</div>
                 <div className="descText">
-                  {ticket.issueDescription || "—"}
+                  {ticket.issueDescription || "No detailed description provided."}
                 </div>
               </div>
             </div>
@@ -202,21 +202,22 @@ export default function TicketDetails() {
 }
 
 function Info({ label, value }) {
+  const fallback = label.includes("Technician") ? "Unassigned" : "Not provided";
   return (
     <div className="info">
       <div className="infoLabel">{label}</div>
-      <div className="infoValue">{value || "—"}</div>
+      <div className="infoValue">{value || fallback}</div>
     </div>
   );
 }
 
 function fmt(v) {
-  if (!v) return "—";
+  if (!v) return "Date unavailable";
 
   try {
     return new Date(v).toLocaleString();
   } catch {
-    return String(v);
+    return "Invalid date";
   }
 }
 

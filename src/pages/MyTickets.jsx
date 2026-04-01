@@ -163,7 +163,7 @@ export default function MyTickets() {
             <div className="ticketDate">
               {ticket.createdAt
                 ? new Date(ticket.createdAt).toLocaleString()
-                : ""}
+                : "Date unavailable"}
             </div>
 
           </div>

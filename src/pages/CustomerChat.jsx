@@ -14,8 +14,8 @@ export default function CustomerChat() {
   const [error, setError] = useState("");
 
   const token = getToken();
-const user = getUser();
-const customerName = user?.name || "Customer";
+  const user = getUser();
+  const customerName = user?.name || "Customer";
 
   /* =========================
      LOGOUT FUNCTION
@@ -122,35 +122,34 @@ const customerName = user?.name || "Customer";
     };
   }, []);
 
-  // 📊 Ticket statistics
+  // 📊 Ticket statistics with exact demo offsets
   const stats = useMemo(() => {
-    const total = tickets.length;
-
-    const selfFixed = tickets.filter((t) => {
+    // Exact offsets as requested (Active: 2, Self-Fixed: 3, Total: 5)
+    // We assume real data is 0 for this demo state, but we add them together.
+    const realTotal = tickets.length;
+    const realFixed = tickets.filter((t) => {
       const s = String(t?.status || "").toLowerCase();
-      return (
-        s.includes("self") ||
-        s.includes("fixed") ||
-        s.includes("resolved")
-      );
+      return s.includes("self") || s.includes("fixed") || s.includes("resolved");
     }).length;
+    const realActive = realTotal - realFixed;
 
-    const active = tickets.filter((t) => {
-      const s = String(t?.status || "").toLowerCase();
-      return !(
-        s.includes("fixed") ||
-        s.includes("resolved") ||
-        s.includes("closed") ||
-        s.includes("self")
-      );
-    }).length;
-
-    return { active, selfFixed, total };
+    return {
+      active: realActive + 2,
+      selfFixed: realFixed + 3,
+      total: realTotal + 5
+    };
   }, [tickets]);
+
+  // Mock tickets for the "Recent Activity" section
+  const mockTickets = [
+    { id: "1772880700000", issue: "Fan making loud noise", status: "Open", date: "2026-03-07" },
+    { id: "1772911", issue: "WiFi Signal Weak", status: "Resolved", date: "2026-03-25" },
+    { id: "1772945", issue: "AC not cooling", status: "In Progress", date: "2026-03-26" },
+  ];
 
   return (
     <div className="page">
-    <style>{css}</style>
+      <style>{css}</style>
 
       <div className="topBar">
         <div className="topBarInner">
@@ -179,13 +178,13 @@ const customerName = user?.name || "Customer";
       <div className="contentWrap">
 
         <div className="hero">
-          
+
           <div className="logoBox">🛡️</div>
 
           <div className="mainTitle">TechNova AI</div>
 
           <div className="subtitle">
-              Welcome, {customerName}
+            Welcome, {customerName}
 
           </div>
 
@@ -220,6 +219,22 @@ const customerName = user?.name || "Customer";
               ↻
             </button>
 
+          </div>
+        </div>
+
+        {/* --- NEW SERVICE INTELLIGENCE --- */}
+        <div className="intelGrid">
+          <div className="intelCard">
+            <div className="intelTitle">AI RESPONSE</div>
+            <div className="intelVal">&lt; 1.2s</div>
+          </div>
+          <div className="intelCard">
+            <div className="intelTitle">SECURITY</div>
+            <div className="intelVal">ACTIVE 🛡️</div>
+          </div>
+          <div className="intelCard">
+            <div className="intelTitle">SUCCESS</div>
+            <div className="intelVal">98.4%</div>
           </div>
         </div>
 
@@ -308,6 +323,20 @@ const customerName = user?.name || "Customer";
             <div className="statLabel">Total</div>
           </div>
 
+        </div>
+
+        {/* --- NEW RECENT TICKETS SECTION --- */}
+        <div className="sectionLabel">RECENT TICKETS (DEMO)</div>
+        <div className="recentList">
+          {mockTickets.map(t => (
+            <div key={t.id} className="miniRow">
+              <div className="rowMain">
+                <div className="rowMsg">ID: #{t.id} - {t.issue}</div>
+                <div className="rowDate">{t.date}</div>
+              </div>
+              <div className={`statusPill status${t.status.replace(' ', '')}`}>{t.status}</div>
+            </div>
+          ))}
         </div>
 
         <div className="howBox">
@@ -420,6 +449,21 @@ const css = `
   .stepText{ font-size:12px; color:#374151; line-height:1.35; }
 
   .footer{ text-align:center; font-size:12px; color:#9ca3af; margin-top:28px; line-height:1.4; }
+
+  /* New analytics & intelligence */
+  .intelGrid{ display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:14px; }
+  .intelCard{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:10px; text-align:center; }
+  .intelTitle{ font-size:9px; font-weight:900; color:#94a3b8; letter-spacing:.5px; }
+  .intelVal{ font-size:12px; font-weight:900; color:#0f172a; margin-top:4px; }
+
+  .recentList{ margin-top:10px; background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:10px; }
+  .miniRow{ display:flex; justify-content:space-between; align-items:center; padding:10px 8px; border-bottom:1px solid #f1f5f9; }
+  .miniRow:last-child{ border-bottom:none; }
+  .rowMsg{ font-size:12px; font-weight:800; color:#1e293b; }
+  .rowDate{ font-size:10px; color:#94a3b8; margin-top:2px; }
+  .statusPill{ font-size:10px; padding:4px 8px; border-radius:999px; font-weight:900; }
+  .statusResolved{ background:#ecfdf5; color:#16a34a; }
+  .statusInProgress{ background:#fff7ed; color:#f59e0b; }
 
   @media (max-width: 768px){
     .topBarInner{ padding:14px 14px; }
